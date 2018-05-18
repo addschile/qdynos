@@ -1,5 +1,5 @@
 import numpy as np
-from utils import dag,norm
+from .utils import dag,norm
 
 class Integrator(object):
 
@@ -38,6 +38,8 @@ class Integrator(object):
 
     def _set_y_value(self, y, t):
         """
+        Sets the function at a certain time. Used for setting the initial
+        condition or in restarting a simulation from a restart file.
         """
         self.y = y.copy()
         self.t = t
@@ -45,14 +47,16 @@ class Integrator(object):
 
     def exact_integrate(self):
         """
+        This integration will directly update the function based on an exact
+        solution of the equation of motion.
         """
         self.y = self.eom(self.y)
-        #dy = self.eom(self.y)
-        #self.y += dy
         self.t += self.dt
 
     def rk4_integrate(self, renorm=0):
         """
+        This integration uses 4-th order Runge-Kutta to update the function
+        based on the equation of motion.
         """
         k = np.zeros_like(self.y)
         dy = np.zeros_like(self.y)
@@ -70,6 +74,11 @@ class Integrator(object):
 
     def rk4_integrate_range(self, t0, t, renorm=1, change_dt=0):
         """
+        This integration uses 4-th order Runge-Kutta to update the function
+        based on the equation of motion, but does it over a timestep that is
+        different the original timestep.
+
+        Used for stochastic unraveling.        
         """
         dt = t-t0
         k = np.zeros_like(self.y)
