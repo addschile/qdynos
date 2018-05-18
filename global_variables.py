@@ -1,2 +1,0 @@
-hbar = None
-kT = None
