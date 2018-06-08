@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import numpy as np
 from .utils import dag,norm
 
@@ -62,8 +63,8 @@ class Integrator(object):
         dy = np.zeros_like(self.y)
 
         for i in range(self.order):
-            k = self.dt*self.eom( self.b[i]*k + self.y )
-            dy += self.a[i]*k.copy()
+            k = self.dt*self.eom( self.b[i]*k + self.y , i)
+            dy += self.a[i]*k
 
         self.y += dy
 

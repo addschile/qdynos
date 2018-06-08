@@ -1,10 +1,10 @@
 from abc import ABCMeta, abstractmethod
 
-class Dynamics(metaclass=ABCMeta):
+class Dynamics():
     """
     Abstract base class for dynamics.
     """
-
+    __metaclass__=ABCMeta
     def __init__(self, hamiltonian):
         """Initialize the Dynamics class.
 
@@ -21,7 +21,13 @@ class Dynamics(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def eom(self, state):
+    def eom(self, state, order):
         """
         Define equation of motion for the dynamics class.
+        """
+
+    @abstractmethod
+    def solve(self, state):
+        """
+        Solve the equations of motion for the dynamics class.
         """

@@ -1,5 +1,6 @@
 import numpy as np
-import .constants as const
+import qdynos.constants as const
+
 from .utils import dag,is_hermitian,is_vector,is_matrix
 
 class Hamiltonian(object):
@@ -7,21 +8,27 @@ class Hamiltonian(object):
     Base Hamiltonian class.
     """
 
-    def __init__(self, H, bath=None, hbar=1.):
+    def __init__(self, H, baths=None, hbar=1.):
         """
         Parameters
         ----------
-        H:
-        bath:
-        hbar:
+        H: np.ndarray
+            Hamiltonian matrix
+        bath: list of Bath classes
+            Baths that independently couple to the system
+        hbar: float
         """
         const.hbar = hbar
         self.nstates = H.shape[0]
         self.check_hermiticity(H)
         self.ham = H
         self.eigensystem()
-        self.bath = bath
+        self.baths = baths
+        if self.baths != None: self.nbaths = len(self.baths)
         
+    def __repr__(self):
+        return "Hamiltonian class"
+
     def check_hermiticity(self, H):
         """
         Check hermiticity of the Hamiltonian
@@ -60,9 +67,13 @@ class Hamiltonian(object):
         else:
             raise AttributeError("Not a valid operator")
 
-    def commutator(self, op):
-        return np.dot(self.ham,op) - np.dot(op,self.ham)
+    def commutator(self, op, eig=True):
+        if eig:
+            return np.dot(np.diag(self.ev),op) - np.dot(op,np.diag(self.ev))
+        else:
+            return np.dot(self.ham,op) - np.dot(op,self.ham)
 
+    """
     def thermal_dm(self):
         if bath!=None
             rho_eq = np.zeros((self.nstates,self.nstates), dtype=complex)
@@ -70,24 +81,35 @@ class Hamiltonian(object):
             return rho_eq/np.trace(rho_eq)
         else:
             raise NotImplementedError("Bath must be initialized before calling")
+    """
 
 class MDHamiltonian(Hamiltonian):
     """
     Hamiltonian class for multidimensional quantum systems 
     (e.g. el-vib models, conical intersection models).
     """
-    def __init__(self, H, nel, nmodes, coords=None, potentials=None, couplings=None, bath=None, hbar=1.):
+    def __init__(self, H, nel, nmodes, coords=None, potentials=None, couplings=None, baths=None, hbar=1.):
         """
         Parameters
         ----------
-        H:
-        nel:
-        nmodes:
-        coords:
-        potentials:
-        couplings:
-        bath:
-        hbar:
+        H: np.ndarray
+            Hamiltonian matrix
+        nel: int
+            number of electronic states
+        nmodes: int
+            number of modes treated in the system (e.g. 2 for minimal conical 
+            intersection)
+        coords: list of list of np.ndarray
+            coordinate operators for each mode in each electronic state
+        potentials: list of functions
+            potential energy as a function of the coordinate for each
+            electronic state
+        couplings: list of functions
+            potential energy as a function of the coordinate for each
+            electronic state
+        baths: list of Bath classes
+            Baths that independently couple to the system
+        hbar: float
         """
         const.hbar = hbar
         self.nstates = H.shape[0]
@@ -103,6 +125,11 @@ class MDHamiltonian(Hamiltonian):
             self.compute_adiabatic = False
             self.potentials = potentials
             self.couplings = couplings
+        self.baths = baths
+        if self.baths != None: self.nbaths = len(self.baths)
+
+    def __repr__(self):
+        return "Multidimensional Hamiltonian class"
 
     def setup_system_operators(self, coords):
         """
@@ -118,6 +145,7 @@ class MDHamiltonian(Hamiltonian):
                     coord_list.append( [w,v] )
                 self.coords.append( coord_list.copy() )
 
+    # TODO this needs testing
     def make_adiabatic_transform(self,coords):
         """
         """
@@ -136,6 +164,7 @@ class MDHamiltonian(Hamiltonian):
             vad = np.kron(vad,np.identity(self.mode_states[i]))
         return vad
 
+    # TODO this needs testing
     def compute_coordinate_surfaces(self, state):
         """
         NOTE: Currently only written for 2 modes (minimal conical intersection)

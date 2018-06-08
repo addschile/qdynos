@@ -3,6 +3,9 @@ import numpy as np
 def dag(op):
     return op.conj().T
 
+def commutator(op1,op2):
+    return np.dot(op1,op2) - np.dot(op2,op1)
+
 def norm(psi):
     if is_vector(psi):
         return np.dot(dag(psi),psi)[0,0].real
@@ -26,3 +29,22 @@ def is_matrix(mat):
 
 def is_tensor(tensor):
     return (len(tensor.shape)>2)
+
+def to_liouville(rho):
+    if len(rho.shape) == 2:
+        # A matrix to a vector
+        return rho.flatten().astype(np.complex)
+    else:
+        # A tensor to a matrix 
+        ns = rho.shape[0]
+        rho_mat = np.zeros((ns*ns,ns*ns), dtype=np.complex)
+        I = 0
+        for i in range(ns):
+            for j in range(ns):
+                J = 0
+                for k in range(ns):
+                    for l in range(ns):
+                        rho_mat[I,J] = rho[i,j,k,l]
+                        J += 1
+                I += 1
+        return rho_mat

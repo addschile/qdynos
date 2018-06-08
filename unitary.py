@@ -1,9 +1,14 @@
+from __future__ import print_function,absolute_import
+
 import numpy as np
+import qdynos.constants as const
+
 from .integrator import Integrator
 from .dynamics import Dynamics
 from .options import Options
 from .results import Results
-import .constants as const
+
+from copy import deepcopy
 
 class UnitaryDM(Dynamics):
     """
@@ -16,8 +21,19 @@ class UnitaryDM(Dynamics):
         ----------
         hamiltonian : Hamiltonian
         """
-        super().__init__(hamiltonian)
+        super(UnitaryDM, self).__init__(hamiltonian)
         self.ham = hamiltonian
+
+    def __str__(self):
+        s = ""
+        s += "Hamiltonian\n"
+        s += "-----------\n"
+        s += str(self.ham.ham)
+        s += "\n"
+        return s
+
+    def __repr__(self):
+        return self.__str__()
 
     def setup(self, options, results):
         """
@@ -31,38 +47,43 @@ class UnitaryDM(Dynamics):
             self.results = Results()
         else:
             self.results = results
+            if self.results.map_ops:
+                assert(str(type(self.ham))=="<class 'qdynos.hamiltonian.MDHamiltonian'>")
+                self.results.map_function = self.ham.compute_coordinate_surfaces
 
     def eom(self, state):
         return self.equation_of_motion(state)
 
-    def dmsolve(self, rho_0, t_init, t_final, dt, options=None, results=None):
+    def solve(self, rho0, times, options=None, results=None):
         """
         Solve Liouville-von Neumann equation for density matrix.
         """
         self.setup(options, results)
-        times = np.arange(t_init, t_final, dt)
-        rho = rho_0.copy()
+        self.dt = times[1]-times[0]
+        rho = rho0.copy()
 
         if self.options.method == 'exact':
+            for i in range(len(self.results.e_ops)):
+                self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
             rho = self.ham.to_eigenbasis(rho)
-            self.prop = np.exp(-1.j*self.ham.omegas*dt)
+            self.prop = np.exp(-1.j*self.ham.omegas*self.dt)
             self.equation_of_motion = lambda x: self.prop*x
-            ode = Integrator(dt, self.eom, self.options)
+            ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(rho, times[0])
-            for time in times:
+            for i,time in enumerate(times):
                 if i%self.results.every==0:
-                    self.results.analyze_state(i, time, self.ham.from_eigenbasis(ode.y))
+                    self.results.analyze_state(i, time, ode.y)
                 ode.integrate()
         else:
             self.equation_of_motion = lambda x: (-1.j/const.hbar)*self.ham.commutator(x)
-            ode = Integrator(dt, self.eom, self.options)
+            ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(rho, times[0])
-            for time in times:
+            for i,time in enumerate(times):
                 if i%self.results.every==0:
                     self.results.analyze_state(i, time, ode.y)
                 ode.integrate()
 
-        return times , self.results
+        return self.results
 
 class UnitaryWF(Dynamics):
     """
@@ -70,14 +91,7 @@ class UnitaryWF(Dynamics):
     """
 
     def __init__(self, hamiltonian):
-        """Initialize the Unitary evolution class. 
-
-        Parameters
-        ----------
-        hamiltonian : HamiltonianSystem
-            An instance of the pyrho HamiltonianSystem class.
-        """
-        super().__init__(hamiltonian)
+        super(UnitaryWF, self).__init__(hamiltonian)
         self.ham = hamiltonian
 
     def setup(self, options, results):
@@ -99,28 +113,28 @@ class UnitaryWF(Dynamics):
     def eom(self, state):
         return np.dot(self.prop,state)
 
-    def wfsolve(self, psi_0, t_init, t_final, dt, options=None, results=None):
+    def solve(self, psi0, times, options=None, results=None):
         """
         Solve time-dependent Schrodinger equation for density matrix.
         """
         self.setup(options,results)
-        times = np.arange(t_init, t_final, dt)
-        psi = psi_0.copy()
+        self.dt = times[1]-times[0]
+        psi = psi0.copy()
 
-        if self.options.verbose:
-            print("")
         if self.options.method == 'exact':
+            for i in range(len(self.results.e_ops)):
+                self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
             psi = self.ham.to_eigenbasis(psi)
-            self.prop = np.diag(np.exp(-(1.j/const.hbar)*self.ham.ev*dt))
-            ode = Integrator(dt, self.eom, self.options)
+            self.prop = np.diag(np.exp(-(1.j/const.hbar)*self.ham.ev*self.dt))
+            ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(psi, times[0])
             for i,time in enumerate(times):
                 if i%self.results.every==0:
-                    self.results.analyze_state(i, time, self.ham.from_eigenbasis(ode.y))
+                    self.results.analyze_state(i, time, ode.y)
                 ode.integrate()
         else:
             self.prop = -(1.j/const.hbar)*self.ham.ham
-            ode = Integrator(dt, self.eom, self.options)
+            ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(psi, times[0])
 
             for i,time in enumerate(times):
@@ -128,4 +142,4 @@ class UnitaryWF(Dynamics):
                     self.results.analyze_state(i, time, ode.y)
                 ode.integrate()
 
-        return times , self.results
+        return self.results
