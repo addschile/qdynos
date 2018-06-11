@@ -62,7 +62,7 @@ class Lindblad(Dynamics):
         # compute unique frequencies
         self.ham.compute_unique_freqs()
 
-        hcorr = np.zeros((nstates,nstates))
+        hcorr = np.zeros((nstates,nstates),dtype=complex)
         self.Ls = []
         self.LdL = []
         self.L0 = []
