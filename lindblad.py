@@ -70,8 +70,8 @@ class Lindblad(Dynamics):
             Ga = self.ham.to_eigenbasis( bath.c_op )
             for i in range(len(self.ham.frequencies)):
                 omega = self.ham.frequencies[i]
-                cf_real = self.ham.sd[op].bath_corr_ft(-omega,np.inf).real
-                cf_imag = self.ham.sd[op].bath_corr_ft(-omega,np.inf).imag
+                cf_real = bath.ft_bath_corr(-omega).real
+                cf_imag = bath.ft_bath_corr(-omega).imag
                 proj = np.zeros((nstates,nstates))
                 for j in range(nstates):
                     for k in range(nstates):
