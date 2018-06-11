@@ -93,7 +93,7 @@ class Lindblad(Dynamics):
                                 ldl_list.append([j,k]) # store jk
                                 self.LdL.append(ldl_list)
 
-        self.A  = (-1.j/const.hbar)*(self.ham.site2eig(self.ham.sys) + hcorr)
+        self.A  = (-1.j/const.hbar)*(self.ham.Heig + hcorr)
 
     def eom(self, state, order):
         return lb_deriv(state,self.A,self.L0,self.LdL)
