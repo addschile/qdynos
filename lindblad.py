@@ -62,7 +62,7 @@ class Lindblad(Dynamics):
         # compute unique frequencies
         self.ham.compute_unique_freqs()
 
-        hcorr = np.zeros((ns,ns))
+        hcorr = np.zeros((nstates,nstates))
         self.Ls = []
         self.LdL = []
         self.L0 = []
@@ -85,8 +85,8 @@ class Lindblad(Dynamics):
                 if self.ham.frequencies[i] == 0.:
                     self.L0.append(L.copy())
                 else:
-                    for j in range(ns):
-                        for k in range(ns):
+                    for j in range(nstates):
+                        for k in range(nstates):
                             if L[j,k] != 0.:
                                 ldl_list = [] # first list is for |L_mn|^2 the second is for [m,n]
                                 ldl_list.append( np.conj(L[j,k])*L[j,k] ) # store |L_jk|^2
