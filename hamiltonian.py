@@ -29,6 +29,10 @@ class Hamiltonian(object):
     def __repr__(self):
         return "Hamiltonian class"
 
+    @property
+    def Heig(self):
+        return np.diag(self.ev)
+
     def check_hermiticity(self, H):
         """
         Check hermiticity of the Hamiltonian
