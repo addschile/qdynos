@@ -68,7 +68,7 @@ class Lindblad(Dynamics):
         self.L0 = []
         for k,bath in enumerate(self.ham.baths):
             Ga = self.ham.to_eigenbasis( bath.c_op )
-            for i in range(len(self.ham.frequencies):
+            for i in range(len(self.ham.frequencies)):
                 omega = self.ham.frequencies[i]
                 cf_real = self.ham.sd[op].bath_corr_ft(-omega,np.inf).real
                 cf_imag = self.ham.sd[op].bath_corr_ft(-omega,np.inf).imag
