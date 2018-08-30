@@ -25,11 +25,13 @@ def add_results(results1, results2, weight=None):
             results1.expect += results2.expect
         if results1.map_ops:
             results1.maps += results2.maps
+        if results1.jumps != None:
+            results1.jumps += results2.jumps
         return results1
 
 def avg_results(ntraj, results):
-    if results.store_states:
-        results.states /= float(ntraj)
+    #if results.store_states:
+    #    results.states /= float(ntraj)
     if results.e_ops != None:
         results.expect /= float(ntraj)
     if results.map_ops:
@@ -126,5 +128,5 @@ class Results(object):
         if self.map_ops:
             self.mapping_expect(state)
 
-    def store_jumps(self, jumps):
-        self.jumps.append( jumps.copy() )
+    def store_jumps(self, njumps, jumps):
+        self.jumps.append( [njumps, jumps.copy()] )
