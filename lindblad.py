@@ -51,7 +51,6 @@ class Lindblad(Dynamics):
                 self.results.map_function = self.ham.compute_coordinate_surfaces
 
         self.ode = Integrator(self.dt, self.eom, self.options)
-
         self.make_lindblad_operators()
 
     def make_lindblad_operators(self):
@@ -62,38 +61,39 @@ class Lindblad(Dynamics):
         # compute unique frequencies
         self.ham.compute_unique_freqs()
 
-        hcorr = np.zeros((nstates,nstates),dtype=complex)
+        self.hcorr = np.zeros((nstates,nstates),dtype=complex)
         self.Ls = []
         self.LdL = []
         self.L0 = []
         for k,bath in enumerate(self.ham.baths):
             Ga = self.ham.to_eigenbasis( bath.c_op )
             for i in range(len(self.ham.frequencies)):
-                omega = self.ham.frequencies[i]
-                cf_real = bath.ft_bath_corr(-omega).real
-                cf_imag = bath.ft_bath_corr(-omega).imag
-                proj = np.zeros((nstates,nstates))
-                for j in range(nstates):
-                    for k in range(nstates):
-                        omega = self.ham.omegas[j,k]
-                        if omega==self.ham.frequencies[i]:
-                            proj[j,k] = 1.
-                L = proj*Ga
-                hcorr += (cf_imag*np.dot(dag(L),L))
-                L *= np.sqrt(cf_real)
-                self.Ls.append(L.copy())
-                if self.ham.frequencies[i] == 0.:
-                    self.L0.append(L.copy())
-                else:
+                if self.ham.frequencies[i] != 0:
+                    omega = self.ham.frequencies[i]
+                    cf_real = bath.ft_bath_corr(-omega).real
+                    cf_imag = bath.ft_bath_corr(-omega).imag
+                    proj = np.zeros((nstates,nstates))
                     for j in range(nstates):
                         for k in range(nstates):
-                            if L[j,k] != 0.:
-                                ldl_list = [] # first list is for |L_mn|^2 the second is for [m,n]
-                                ldl_list.append( np.conj(L[j,k])*L[j,k] ) # store |L_jk|^2
-                                ldl_list.append([j,k]) # store jk
-                                self.LdL.append(ldl_list)
+                            omega = self.ham.omegas[j,k]
+                            if omega==self.ham.frequencies[i]:
+                                proj[j,k] = 1.
+                    L = proj*Ga
+                    self.hcorr += (cf_imag*np.dot(dag(L),L))
+                    L *= np.sqrt(cf_real)
+                    self.Ls.append( L.copy() )
+                    if self.ham.frequencies[i] == 0.:
+                        self.L0.append(L.copy())
+                    else:
+                        for j in range(nstates):
+                            for k in range(nstates):
+                                if L[j,k] != 0.:
+                                    ldl_list = [] # first list is for |L_mn|^2 the second is for [m,n]
+                                    ldl_list.append( np.conj(L[j,k])*L[j,k] ) # store |L_jk|^2
+                                    ldl_list.append([j,k]) # store jk
+                                    self.LdL.append(ldl_list)
 
-        self.A  = (-1.j/const.hbar)*(self.ham.Heig + hcorr)
+        self.A  = (-1.j/const.hbar)*(self.ham.Heig + self.hcorr)
 
     def eom(self, state, order):
         return lb_deriv(state,self.A,self.L0,self.LdL)
