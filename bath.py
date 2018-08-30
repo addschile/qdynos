@@ -2,7 +2,6 @@ import numpy as np
 import qdynos.constants as const
 
 from scipy.integrate import quad
-from numba import vectorize,float32,float64
 
 def switch(w, wstar):
     """A smooth switching function for spectral density decompositions.
