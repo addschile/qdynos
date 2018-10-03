@@ -55,7 +55,9 @@ class Hamiltonian(object):
     def compute_unique_freqs(self):
         self.frequencies = np.unique(self.omegas)
 
-    def to_eigenbasis(self, op):
+    def to_eigenbasis(self, op, ntrunc=None):
+        if ntrunc==None:
+            ntrunc = self.nstates
         if is_vector(op):
             return np.dot(dag(self.ek), op)
         elif is_matrix(op):
@@ -71,11 +73,13 @@ class Hamiltonian(object):
         else:
             raise AttributeError("Not a valid operator")
 
-    def commutator(self, op, eig=True):
+    def commutator(self, op, eig=True, ntrunc=None):
+        if ntrunc==None:
+            ntrunc = self.nstates
         if eig:
-            return np.dot(np.diag(self.ev),op) - np.dot(op,np.diag(self.ev))
+            return np.dot(np.diag(self.ev[:ntrunc]),op) - np.dot(op,np.diag(self.ev[:ntrunc]))
         else:
-            return np.dot(self.ham,op) - np.dot(op,self.ham)
+            return np.dot(self.ham[:ntrunc,:ntrunc],op) - np.dot(op,self.ham[:ntrunc,:ntrunc])
 
     """
     def thermal_dm(self):
