@@ -8,6 +8,7 @@ from .dynamics import Dynamics
 from .utils import commutator,dag,to_liouville
 from .options import Options
 from .results import Results
+from .logging import print_method,print_stage
 
 class Redfield(Dynamics):
     """Dynamics class for Redfield-like dynamics. Can perform both 
@@ -28,6 +29,13 @@ class Redfield(Dynamics):
         self.ham = ham
         self.time_dep = time_dependent
         self.is_secular = is_secular
+        #if self.time_dep:
+        #    print_method("TCL2")
+        #else:
+        #    if self.is_secular:
+        #        print_method("Secular Redfield Theory")
+        #    else:
+        #        print_method("Redfield Theory")
 
     def setup(self, options, results):
         # generic setup
@@ -46,13 +54,10 @@ class Redfield(Dynamics):
                 self.results.map_function = self.ham.compute_coordinate_surfaces
 
         self.ode = Integrator(self.dt, self.eom, self.options)
-
         if self.options.method != "exact":
             if self.time_dep:
-                self.coupling_operators_setup()
                 self.equation_of_motion = self.td_rf_eom
             else:
-                self.make_redfield_operators()
                 self.equation_of_motion = self.rf_eom
 
     def make_redfield_operators(self):
@@ -68,8 +73,8 @@ class Redfield(Dynamics):
                 for j in range(nstates):
                     theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
             Ga_plus = Ga*theta_plus
-            self.C.append(Ga.copy())
-            self.E.append(Ga_plus.copy())
+            self.C.append(Ga.copy()[:self.ntrunc,:self.ntrunc])
+            self.E.append(Ga_plus.copy()[:self.ntrunc,:self.ntrunc])
 
     def coupling_operators_setup(self):
         """Make coupling operators and initialize "dressing" for copuling 
@@ -130,7 +135,7 @@ class Redfield(Dynamics):
         return self.equation_of_motion(state, order)
 
     def rf_eom(self, state, order):
-        dy = (-1.j/const.hbar)*self.ham.commutator(state)
+        dy = (-1.j/const.hbar)*self.ham.commutator(state, ntrunc=self.ntrunc)
         for j in range(len(self.ham.baths)):
             dy += (commutator(np.dot(self.E[j],state),self.C[j]) + commutator(self.C[j],np.dot(state,dag(self.E[j]))))/const.hbar**2.
         return dy
@@ -141,7 +146,7 @@ class Redfield(Dynamics):
             dy += (commutator(np.dot(self.E[j][order],state),self.C[j]) + commutator(self.C[j],np.dot(state,dag(self.E[j][order]))))/const.hbar**2.
         return dy
 
-    def solve(self, rho0, times, options=None, results=None):
+    def solve(self, rho0, times, ntrunc=None, options=None, results=None):
         """Solve the Redfield equations of motion.
 
         Parameters
@@ -155,9 +160,26 @@ class Redfield(Dynamics):
         -------
         results : Results class
         """
+        if ntrunc==None:
+            self.ntrunc = self.ham.nstates
+        else:
+            self.ntrunc = ntrunc
         self.dt = times[1]-times[0]
         self.setup(options, results)
-        rho = self.ham.to_eigenbasis(rho0.copy())
+        rho = self.ham.to_eigenbasis(rho0.copy())[:ntrunc,:ntrunc]
+
+        if self.options.method != "exact":
+            print_stage("Initializing Coupling Operators")
+            if self.time_dep:
+                self.coupling_operators_setup()
+                self.equation_of_motion = self.td_rf_eom
+            else:
+                self.make_redfield_operators()
+                self.equation_of_motion = self.rf_eom
+        print_stage("Finished Constructing Operators")
+        print_stage("Propagating Equation of Motion")
+        for i in range(len(self.results.e_ops)):
+            self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])[:ntrunc,:ntrunc]
 
         if self.options.method == 'exact':
             raise NotImplementedError
@@ -173,7 +195,7 @@ class Redfield(Dynamics):
                 for time in times:
                     if i%self.results.every==0:
                         if self.options.progress: print(i)
-                        self.results.analyze_state(i, time, self.ham.from_eigenbasis(ode.y))
+                        self.results.analyze_state(i, time, ode.y)
                     ode.integrate()
         else:
             self.ode._set_y_value(rho, times[0])
@@ -182,7 +204,7 @@ class Redfield(Dynamics):
                     self.update_ops(time)
                 if i%self.results.every==0:
                     if self.options.progress: print(i)
-                    self.results.analyze_state(i, time, self.ham.from_eigenbasis(self.ode.y))
+                    self.results.analyze_state(i, time, self.ode.y)
                 self.ode.integrate()
 
         return self.results
