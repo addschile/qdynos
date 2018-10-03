@@ -2,6 +2,7 @@ from __future__ import print_function,absolute_import
 
 import numpy as np
 import qdynos.constants as const
+from time import time
 
 from .integrator import Integrator
 from .dynamics import Dynamics
@@ -29,13 +30,13 @@ class Redfield(Dynamics):
         self.ham = ham
         self.time_dep = time_dependent
         self.is_secular = is_secular
-        #if self.time_dep:
-        #    print_method("TCL2")
-        #else:
-        #    if self.is_secular:
-        #        print_method("Secular Redfield Theory")
-        #    else:
-        #        print_method("Redfield Theory")
+        if self.time_dep:
+            print_method("TCL2")
+        else:
+            if self.is_secular:
+                print_method("Secular Redfield Theory")
+            else:
+                print_method("Redfield Theory")
 
     def setup(self, options, results):
         # generic setup
@@ -165,19 +166,25 @@ class Redfield(Dynamics):
         else:
             self.ntrunc = ntrunc
         self.dt = times[1]-times[0]
+        tobs = len(times)
         self.setup(options, results)
         rho = self.ham.to_eigenbasis(rho0.copy())[:ntrunc,:ntrunc]
 
         if self.options.method != "exact":
-            print_stage("Initializing Coupling Operators")
+            if self.options.verbose:
+                print_stage("Initializing Coupling Operators")
+                btime = time()
             if self.time_dep:
                 self.coupling_operators_setup()
                 self.equation_of_motion = self.td_rf_eom
             else:
                 self.make_redfield_operators()
                 self.equation_of_motion = self.rf_eom
-        print_stage("Finished Constructing Operators")
-        print_stage("Propagating Equation of Motion")
+            if self.options.verbose:
+                etime = time()
+                print_stage("Finished Constructing Operators")
+                print("Elapsed time:",etime-btime,"\n")
+                print_stage("Propagating Equation of Motion")
         for i in range(len(self.results.e_ops)):
             self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])[:ntrunc,:ntrunc]
 
@@ -192,19 +199,23 @@ class Redfield(Dynamics):
                 self.equation_of_motion = lambda x: np.dot(self.prop,x)
                 rho = self.ham.to_eigenbasis(rho)
                 ode._set_y_value(rho, times[0])
-                for time in times:
+                for tau in times:
                     if i%self.results.every==0:
                         if self.options.progress: print(i)
-                        self.results.analyze_state(i, time, ode.y)
+                        self.results.analyze_state(i, tau, ode.y)
                     ode.integrate()
         else:
             self.ode._set_y_value(rho, times[0])
-            for i,time in enumerate(times):
+            btime = time()
+            for i,tau in enumerate(times):
+                if self.options.progress:
+                    if i%int(tobs/10)==0:
+                        etime = time()
+                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
                 if self.time_dep:
-                    self.update_ops(time)
+                    self.update_ops(tau)
                 if i%self.results.every==0:
-                    if self.options.progress: print(i)
-                    self.results.analyze_state(i, time, self.ode.y)
+                    self.results.analyze_state(i, tau, self.ode.y)
                 self.ode.integrate()
 
         return self.results
