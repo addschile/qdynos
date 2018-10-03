@@ -110,7 +110,7 @@ class UnitaryWF(Dynamics):
                 assert(str(type(self.ham))=="<class 'qdynos.hamiltonian.MDHamiltonian'>")
                 self.results.map_function = self.ham.compute_coordinate_surfaces
 
-    def eom(self, state):
+    def eom(self, state, ind):
         return np.dot(self.prop,state)
 
     def solve(self, psi0, times, options=None, results=None):
@@ -130,6 +130,7 @@ class UnitaryWF(Dynamics):
             ode._set_y_value(psi, times[0])
             for i,time in enumerate(times):
                 if i%self.results.every==0:
+                    print(i)
                     self.results.analyze_state(i, time, ode.y)
                 ode.integrate()
         else:
@@ -139,6 +140,7 @@ class UnitaryWF(Dynamics):
 
             for i,time in enumerate(times):
                 if i%self.results.every==0:
+                    print(i)
                     self.results.analyze_state(i, time, ode.y)
                 ode.integrate()
 
