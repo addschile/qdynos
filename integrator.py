@@ -51,7 +51,7 @@ class Integrator(object):
         This integration will directly update the function based on an exact
         solution of the equation of motion.
         """
-        self.y = self.eom(self.y)
+        self.y = self.eom(self.y, 0)
         self.t += self.dt
 
     def rk4_integrate(self, renorm=0):
