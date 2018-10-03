@@ -24,7 +24,7 @@ class colors:
     GRAY      = "\033[37m"
     BLACK     = "\033[30m"
 
-def pprint( color, text, newline=True ):
+def pprint(color, text, newline=True):
     """
     Function that prints text to the system in different colors.
 
@@ -39,7 +39,7 @@ def pprint( color, text, newline=True ):
 
     Example
     -------
-    from pretty_printing import *
+    from pretty_printing import pprint
     pprint( orange, "Hello world!")
     """
     sys.stdout.write( color + text + colors.ENDC )
