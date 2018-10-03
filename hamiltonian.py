@@ -47,10 +47,8 @@ class Hamiltonian(object):
         self.compute_frequencies()
 
     def compute_frequencies(self):
-        self.omegas = np.zeros((self.nstates,self.nstates))
-        for i in range(self.nstates):
-            for j in range(self.nstates):
-                self.omegas[i,j] = (self.ev[i]-self.ev[j])/const.hbar
+        self.omegas = np.array([[(self.ev[i]-self.ev[j]) for j in range(self.nstates)]
+                                    for i in range(self.nstates)])/const.hbar
 
     def compute_unique_freqs(self):
         self.frequencies = np.unique(self.omegas)
