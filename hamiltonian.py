@@ -77,9 +77,9 @@ class Hamiltonian(object):
         if ntrunc==None:
             ntrunc = self.nstates
         if eig:
-            return np.dot(np.diag(self.ev[:ntrunc]),op) - np.dot(op,np.diag(self.ev[:ntrunc]))
+            return self.Heig[:ntrunc,:ntrunc]@op - op@self.Heig[:ntrunc,:ntrunc]
         else:
-            return np.dot(self.ham[:ntrunc,:ntrunc],op) - np.dot(op,self.ham[:ntrunc,:ntrunc])
+            return self.ham[:ntrunc,:ntrunc]@op - op@self.ham[:ntrunc,:ntrunc]
 
     """
     def thermal_dm(self):
