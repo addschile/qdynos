@@ -2,8 +2,6 @@ import numpy as np
 import qdynos.constants as const
 
 from scipy.integrate import quad
-from scipy.special import gammainc
-from scipy.special import expi
 
 from numba import jit,double
 
@@ -83,11 +81,6 @@ class Bath(object):
         Notes
         -----
         (1/\pi)\int_0^{\infty} dw J(w)/w
-        """
-        raise NotImplementedError
-
-    def pvalues(self, omega):
-        """
         """
         raise NotImplementedError
 
@@ -183,15 +176,6 @@ class OhmicExp(Bath):
         re_bcf_t = self.eta*self.wc**2.*(1.-self.wc**2.*t**2.)/(1.+self.wc**2.*t**2.)**2.
         im_bcf_t = 2.*self.eta*self.wc**3.*t/(1.+self.wc**2.*t**2.)**2.
         return re_bcf_t - 1.j*im_bcf_t
-
-    def pvalues(self, omega):
-        """
-        """
-        pv1 = self.eta*(self.wc - np.exp(-omega/self.wc)*omega*expi(omega/self.wc))
-        pv2 = self.eta*(self.wc + np.exp(omega/self.wc)*omega*expi(-omega/self.wc))
-        #pv1 = self.eta*(self.wc + np.exp(-omega/self.wc)*omega*(gammainc(0,-omega/self.wc)+np.log(self.wc)-np.log(omega)+np.log(-omega/self.wc)))
-        #pv2 = self.eta*(self.wc - np.exp(omega/self.wc)*omega*(gammainc(0,omega/self.wc)+np.log(self.wc)-np.log(-omega)+np.log(omega/self.wc)))
-        return pv1,pv2
 
     @property
     def spectral_density_limit_at_zero(self):
