@@ -3,6 +3,7 @@ from __future__ import print_function,absolute_import
 import numpy as np
 import qdynos.constants as const
 from time import time
+from numba import jit,njit,prange
 
 from .integrator import Integrator
 from .dynamics import Dynamics
@@ -69,10 +70,12 @@ class Redfield(Dynamics):
         self.E = list()
         for k,bath in enumerate(self.ham.baths):
             Ga = self.ham.to_eigenbasis( bath.c_op )
-            theta_plus = np.zeros((nstates,nstates),dtype=complex)
+            theta_zero = bath.ft_bath_corr(0.0)
+            theta_plus = theta_zero*np.identity(nstates,dtype=complex)
             for i in range(nstates):
                 for j in range(nstates):
-                    theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
+                    if i!=j:
+                        theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
             Ga_plus = Ga*theta_plus
             self.C.append(Ga.copy()[:self.ntrunc,:self.ntrunc])
             self.E.append(Ga_plus.copy()[:self.ntrunc,:self.ntrunc])
@@ -138,7 +141,9 @@ class Redfield(Dynamics):
     def rf_eom(self, state, order):
         dy = (-1.j/const.hbar)*self.ham.commutator(state, ntrunc=self.ntrunc)
         for j in range(len(self.ham.baths)):
-            dy += (commutator(np.dot(self.E[j],state),self.C[j]) + commutator(self.C[j],np.dot(state,dag(self.E[j]))))/const.hbar**2.
+            dy += (commutator(self.E[j]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j])))/const.hbar**2.
+            #dy += (commutator(np.matmul(self.E[j],state),self.C[j]) + commutator(self.C[j],np.matmul(state,dag(self.E[j]))))/const.hbar**2.
+            #dy += (commutator(np.dot(self.E[j],state),self.C[j]) + commutator(self.C[j],np.dot(state,dag(self.E[j]))))/const.hbar**2.
         return dy
 
     def td_rf_eom(self, state, order):
