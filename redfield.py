@@ -142,8 +142,6 @@ class Redfield(Dynamics):
         dy = (-1.j/const.hbar)*self.ham.commutator(state, ntrunc=self.ntrunc)
         for j in range(len(self.ham.baths)):
             dy += (commutator(self.E[j]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j])))/const.hbar**2.
-            #dy += (commutator(np.matmul(self.E[j],state),self.C[j]) + commutator(self.C[j],np.matmul(state,dag(self.E[j]))))/const.hbar**2.
-            #dy += (commutator(np.dot(self.E[j],state),self.C[j]) + commutator(self.C[j],np.dot(state,dag(self.E[j]))))/const.hbar**2.
         return dy
 
     def td_rf_eom(self, state, order):
