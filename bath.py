@@ -2,6 +2,25 @@ import numpy as np
 import qdynos.constants as const
 
 from scipy.integrate import quad
+from scipy.special import gammainc
+from scipy.special import expi
+
+from numba import jit,double
+
+@jit(double(double, double, double),nopython=True)
+def bose(w, kT, hbar):
+    """
+    Fucntion for Bose-Einstein distribution.
+    """
+    return 1./np.expm1(w*hbar/kT)
+
+@jit(double(double, double, double),nopython=True)
+def ohmic_exp(w, eta, wc):
+    return eta*w*np.exp(-w/wc)
+
+@jit(double(double, double, double),nopython=True)
+def debye(w, eta, wc):
+    return eta*w/(w**2. + wc**2.)
 
 def switch(w, wstar):
     """A smooth switching function for spectral density decompositions.
@@ -30,12 +49,6 @@ class Bath(object):
     -------
     """
 
-    def bose(self, w):
-        """
-        Fucntion for Bose-Einstein distribution.
-        """
-        return 1./np.expm1(w*const.hbar/self.kT)
-
     def real_bath_corr(self, w):
         """
         Real part of the bath correlation function.
@@ -43,7 +56,7 @@ class Bath(object):
         if w==0:
             return self.J0*self.kT
         else:
-            return const.hbar*(self.bose(w)+1.)*((w>0)*self.J_omega(w) - (w<0)*self.J_omega(abs(w)))
+            return const.hbar*(bose(w,self.kT,const.hbar)+1.)*((w>0)*self.J_omega(w) - (w<0)*self.J_omega(abs(w)))
 
     def spectral_density_func(self, w):
         """Spectral density function in functional form.
@@ -70,6 +83,11 @@ class Bath(object):
         Notes
         -----
         (1/\pi)\int_0^{\infty} dw J(w)/w
+        """
+        raise NotImplementedError
+
+    def pvalues(self, omega):
+        """
         """
         raise NotImplementedError
 
@@ -159,12 +177,21 @@ class OhmicExp(Bath):
         self.J0 = self.spectral_density_limit_at_zero
 
     def spectral_density_func(self, w):
-        return self.eta*w*np.exp(-w/self.wc)
+        return ohmic_exp(w,self.eta,self.wc)
 
     def zero_T_bcf_t(self, t):
         re_bcf_t = self.eta*self.wc**2.*(1.-self.wc**2.*t**2.)/(1.+self.wc**2.*t**2.)**2.
         im_bcf_t = 2.*self.eta*self.wc**3.*t/(1.+self.wc**2.*t**2.)**2.
         return re_bcf_t - 1.j*im_bcf_t
+
+    def pvalues(self, omega):
+        """
+        """
+        pv1 = self.eta*(self.wc - np.exp(-omega/self.wc)*omega*expi(omega/self.wc))
+        pv2 = self.eta*(self.wc + np.exp(omega/self.wc)*omega*expi(-omega/self.wc))
+        #pv1 = self.eta*(self.wc + np.exp(-omega/self.wc)*omega*(gammainc(0,-omega/self.wc)+np.log(self.wc)-np.log(omega)+np.log(-omega/self.wc)))
+        #pv2 = self.eta*(self.wc - np.exp(omega/self.wc)*omega*(gammainc(0,omega/self.wc)+np.log(self.wc)-np.log(-omega)+np.log(omega/self.wc)))
+        return pv1,pv2
 
     @property
     def spectral_density_limit_at_zero(self):
@@ -198,7 +225,7 @@ class DebyeBath(Bath):
         self.J0 = self.spectral_density_limit_at_zero
 
     def spectral_density_func(self, w):
-        return self.eta*w/(w**2.+self.wc**2.)
+        return debye(w,self.eta,self.wc)
 
     def zero_T_bcf_t(self, t):
         raise NotImplementedError
