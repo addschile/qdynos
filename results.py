@@ -43,7 +43,7 @@ class Results(object):
     Results class that helps organize and print out relevant results.
     """
 
-    def __init__(self, tobs=None, e_ops=None, map_ops=False, store_states=False, 
+    def __init__(self, tobs=None, e_ops=None, print_es=False, es_file=None, map_ops=False, store_states=False, 
         print_states=False, states_file=None, jump_stats=False, every=1):
         """
         Initialize results class.
@@ -63,8 +63,16 @@ class Results(object):
         # expectation value containers #
         self.e_ops = e_ops
         self.expect = None
+        self.print_es = print_es
+        self.fes = None
         if self.e_ops != None:
-            self.expect = np.zeros((len(self.e_ops),tobs))
+            if self.print_es:
+                if es_file==None:
+                    self.fes = open('output.dat','w')
+                else:
+                    self.fes = open(es_file,'w')
+            else:
+                self.expect = np.zeros((len(self.e_ops),tobs))
         # mapping expectation value containers #
         self.map_ops = map_ops
         if self.map_ops:
@@ -89,14 +97,26 @@ class Results(object):
         """
         Computes expectation values.
         """
-        if is_vector(state):
-            for i,e_op in enumerate(self.e_ops):
-                self.expect[i,ind] = np.dot(state.conj().T, np.dot(e_op,state))[0,0].real
-        elif is_matrix(state):
-            for i,e_op in enumerate(self.e_ops):
-                self.expect[i,ind] = np.trace( np.dot(e_op,state) ).real
+        if self.print_es:
+            if is_vector(state):
+                for i,e_op in enumerate(self.e_ops):
+                    self.fes.write('%.8f '%(np.dot(state.conj().T, np.dot(e_op,state))[0,0].real))
+                self.fes.write('\n')
+            elif is_matrix(state):
+                for i,e_op in enumerate(self.e_ops):
+                    self.fes.write('%.8f '%(np.trace( np.dot(e_op,state) ).real))
+                self.fes.write('\n')
+            else:
+                raise ValueError("State needs to be either a vector or matrix")
         else:
-            raise ValueError("State needs to be either a vector or matrix")
+            if is_vector(state):
+                for i,e_op in enumerate(self.e_ops):
+                    self.expect[i,ind] = np.dot(state.conj().T, np.dot(e_op,state))[0,0].real
+            elif is_matrix(state):
+                for i,e_op in enumerate(self.e_ops):
+                    self.expect[i,ind] = np.trace( np.dot(e_op,state) ).real
+            else:
+                raise ValueError("State needs to be either a vector or matrix")
 
     def mapping_expect(self, state):
         self.maps.append( self.map_function(state) )
@@ -124,6 +144,7 @@ class Results(object):
         if self.print_states:
             self.print_state(ind, time,state)
         if self.e_ops != None:
+            if self.print_es: self.fes.write('%.8f '%(time))
             self.compute_expectation(ind, state)
         if self.map_ops:
             self.mapping_expect(state)
