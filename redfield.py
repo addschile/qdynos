@@ -72,6 +72,7 @@ class Redfield(Dynamics):
             theta_zero = bath.ft_bath_corr(0.0)
             theta_plus = theta_zero*np.identity(nstates,dtype=complex)
             for i in range(nstates):
+                if self.options.really_verbose: print("%d rows of %d"%(i,nstates))
                 for j in range(nstates):
                     if i!=j:
                         theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
