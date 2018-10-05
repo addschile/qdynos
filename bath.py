@@ -22,19 +22,19 @@ def ohmic_exp_zero_T_bcf_t(t, eta, wc):
     im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
     return re_bcf_t - 1.j*im_bcf_t
 
-@jit(double(double, double, double),nopython=True)
-def ohmic_exp_im_bath_corr_bose(t, eta, wc):
+@jit(double(double, double, double, double),nopython=True)
+def ohmic_exp_im_bath_corr_bose(t, eta, wc, hbar):
     im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
-    return im_bcf_t
+    return hbar*im_bcf_t
 
 @jit(double(double, double, double),nopython=True)
 def debye(w, eta, wc):
     return eta*w/(w**2. + wc**2.)
 
-@jit(double(double, double, double),nopython=True)
-def debye_im_bath_corr_bose(t, eta, wc):
+@jit(double(double, double, double, double),nopython=True)
+def debye_im_bath_corr_bose(t, eta, wc, hbar):
     im_bcf_t = 0.5*np.pi*eta*np.exp(-wc*t)
-    return im_bcf_t
+    return hbar*im_bcf_t
 
 def switch(w, wstar):
     """A smooth switching function for spectral density decompositions.
@@ -136,6 +136,8 @@ class Bath(object):
             #NOTE: don't integrate to infinity for numerical stability
             re_Ct = quad(bath_corr_bose, 0.0, self.omega_inf, limit=1000, weight='cos', wvar=t)
             im_Ct = self.im_bath_corr_bose(t)
+            re_Ct = re_Ct[0]
+            return (1.0/np.pi)*(re_Ct - 1.j*im_Ct)
             #NOTE: this is what pyrho has
             #re_Ct = quad(self.real_bath_corr, 
             #                        -self.omega_inf, self.omega_inf,
@@ -144,8 +146,7 @@ class Bath(object):
             #                        -self.omega_inf, self.omega_inf,
             #                        limit=1000, weight='sin', wvar=t)
             #re_Ct, im_Ct = re_Ct[0], -im_Ct[0]
-            re_Ct = re_Ct[0]
-            return (1.0/np.pi)*(re_Ct - 1.j*im_Ct)
+            #return (1.0/np.pi)*(re_Ct + 1.j*im_Ct)
 
     def compute_omegas(self, nmodes):
         """
@@ -201,7 +202,7 @@ class OhmicExp(Bath):
         return ohmic_exp_zero_T_bcf_t(t,self.eta,self.wc)
 
     def im_bath_corr_bose(self, t):
-        return ohmic_exp_im_bath_corr_bose(t,self.eta,self.wc)
+        return ohmic_exp_im_bath_corr_bose(t,self.eta,self.wc,const.hbar)
 
     @property
     def spectral_density_limit_at_zero(self):
@@ -241,7 +242,7 @@ class DebyeBath(Bath):
         raise NotImplementedError
 
     def im_bath_corr_bose(self, t):
-        return debye_im_bath_corr_bose(t,self.eta,self.wc)
+        return debye_im_bath_corr_bose(t,self.eta,self.wc,const.hbar)
 
     @property
     def spectral_density_limit_at_zero(self):
