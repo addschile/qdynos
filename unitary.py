@@ -2,6 +2,7 @@ from __future__ import print_function,absolute_import
 
 import numpy as np
 from time import time
+from copy import deepcopy
 
 import qdynos.constants as const
 
@@ -9,8 +10,7 @@ from .integrator import Integrator
 from .dynamics import Dynamics
 from .options import Options
 from .results import Results
-
-from copy import deepcopy
+from .logging import print_method,print_stage
 
 class UnitaryDM(Dynamics):
     """
@@ -25,6 +25,7 @@ class UnitaryDM(Dynamics):
         """
         super(UnitaryDM, self).__init__(hamiltonian)
         self.ham = hamiltonian
+        print_method("Unitary DM")
 
     def __str__(self):
         s = ""
@@ -73,6 +74,7 @@ class UnitaryDM(Dynamics):
             self.equation_of_motion = lambda x: self.prop*x
             ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(rho, times[0])
+            print_stage("Propagating Equation of Motion")
             for i,tau in enumerate(times):
                 if self.options.progress:
                     if i%int(tobs/10)==0:
@@ -107,6 +109,7 @@ class UnitaryWF(Dynamics):
     def __init__(self, hamiltonian):
         super(UnitaryWF, self).__init__(hamiltonian)
         self.ham = hamiltonian
+        print_method("Unitary WF")
 
     def setup(self, options, results):
         """
@@ -157,6 +160,7 @@ class UnitaryWF(Dynamics):
             ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(psi, times[0])
             btime = time()
+            print_stage("Propagating Equation of Motion")
             for i,tau in enumerate(times):
                 if self.options.progress:
                     if i%int(tobs/10)==0:
