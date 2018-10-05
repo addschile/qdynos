@@ -1,8 +1,9 @@
 from __future__ import print_function,absolute_import
 
 import numpy as np
-import qdynos.constants as const
 from time import time
+
+import qdynos.constants as const
 
 from .integrator import Integrator
 from .dynamics import Dynamics
@@ -31,7 +32,10 @@ class Redfield(Dynamics):
         self.time_dep = time_dependent
         self.is_secular = is_secular
         if self.time_dep:
-            print_method("TCL2")
+            if self.is_secular:
+                print_method("Secular TCL2")
+            else:
+                print_method("TCL2")
         else:
             if self.is_secular:
                 print_method("Secular Redfield Theory")
@@ -68,6 +72,7 @@ class Redfield(Dynamics):
         self.C = list()
         self.E = list()
         for k,bath in enumerate(self.ham.baths):
+            if self.options.really_verbose: print("operator %d of %d"%(k,len(self.ham.baths)))
             Ga = self.ham.to_eigenbasis( bath.c_op )
             theta_zero = bath.ft_bath_corr(0.0)
             theta_plus = theta_zero*np.identity(nstates,dtype=complex)
@@ -223,6 +228,7 @@ class Redfield(Dynamics):
                     if i%int(tobs/10)==0:
                         etime = time()
                         print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                    elif self.options.really_verbose: print(i)
                 if self.time_dep:
                     self.update_ops(tau)
                 if i%self.results.every==0:
