@@ -86,11 +86,11 @@ class Redfield(Dynamics):
         self.C = []
         self.gamma_n = [[]]*self.ham.nbaths
         self.gamma_n_1 = [[]]*self.ham.nbaths
-        ns = self.ham.nstates
+        ns = self.ntrunc
         b = self.ode.b
 
         for op,bath in enumerate(self.ham.baths):
-            self.C.append( self.ham.to_eigenbasis( bath.c_op ) )
+            self.C.append( self.ham.to_eigenbasis( bath.c_op )[:self.ntrunc,:self.ntrunc] )
             self.gamma_n[op] = list()
             self.gamma_n_1[op] = list()
 
@@ -98,11 +98,11 @@ class Redfield(Dynamics):
             for k in range(self.ode.order):
                 t = b[k]*self.dt
                 if k==0:
-                    self.gamma_n[op].append( np.zeros((self.ham.nstates,self.ham.nstates),dtype=complex) )
-                    theta_plus = np.exp(-1.j*self.ham.omegas*0.0)*bath.bath_corr_t(0.0)
+                    self.gamma_n[op].append( np.zeros((self.ntrunc,self.ntrunc),dtype=complex) )
+                    theta_plus = np.exp(-1.j*self.ham.omegas[:self.ntrunc,:self.ntrunc]*0.0)*bath.bath_corr_t(0.0)
                     self.gamma_n_1[op].append(theta_plus.copy())
                 else:
-                    theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
+                    theta_plus = np.exp(-1.j*self.ham.omegas[:self.ntrunc,:self.ntrunc]*t)*bath.bath_corr_t(t)
                     self.gamma_n[op].append( self.gamma_n[op][k-1] + 0.5*(b[k]-b[k-1])*self.dt*(theta_plus + self.gamma_n_1[op][k-1]) )
                     self.gamma_n_1[op].append( theta_plus.copy() )
 
@@ -114,7 +114,7 @@ class Redfield(Dynamics):
         for op,bath in enumerate(self.ham.baths):
             for k in range(self.ode.order):
                 t = time + b[k]*self.dt
-                theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
+                theta_plus = np.exp(-1.j*self.ham.omegas[:self.ntrunc,:self.ntrunc]*t)*bath.bath_corr_t(t)
                 if k==0:
                     self.gamma_n[op][k] = self.gamma_n[op][-1].copy()
                     self.gamma_n_1[op][k] = theta_plus.copy()
@@ -138,15 +138,23 @@ class Redfield(Dynamics):
         return self.equation_of_motion(state, order)
 
     def rf_eom(self, state, order):
+        # TODO unbiased test
+        #dy = (-1.j/const.hbar)*self.ham.Heig[:self.ntrunc,:self.ntrunc]@state
+        #dy -= (-1.j/const.hbar)*state@self.ham.Heig[:self.ntrunc,:self.ntrunc]
+        #for j in range(len(self.ham.baths)):
+            #dy += self.E[j]@state@self.C[j]/const.hbar**2.
+            #dy -= self.C[j]@self.E[j]@state/const.hbar**2.
+            #dy += self.C[j]@state@dag(self.E[j])/const.hbar**2.
+            #dy -= state@dag(self.E[j])@self.C[j]/const.hbar**2.
         dy = (-1.j/const.hbar)*self.ham.commutator(state, ntrunc=self.ntrunc)
         for j in range(len(self.ham.baths)):
             dy += (commutator(self.E[j]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j])))/const.hbar**2.
         return dy
 
     def td_rf_eom(self, state, order):
-        dy = (-1.j/const.hbar)*self.ham.commutator(state)
+        dy = (-1.j/const.hbar)*self.ham.commutator(state, ntrunc=self.ntrunc)
         for j in range(len(self.ham.baths)):
-            dy += (commutator(np.dot(self.E[j][order],state),self.C[j]) + commutator(self.C[j],np.dot(state,dag(self.E[j][order]))))/const.hbar**2.
+            dy += (commutator(self.E[j][order]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j][order])))/const.hbar**2.
         return dy
 
     def solve(self, rho0, times, ntrunc=None, options=None, results=None):
