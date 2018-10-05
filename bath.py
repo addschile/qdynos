@@ -3,7 +3,7 @@ import qdynos.constants as const
 
 from scipy.integrate import quad
 
-from numba import jit,double
+from numba import jit,double,complex128
 
 @jit(double(double, double, double),nopython=True)
 def bose(w, kT, hbar):
@@ -16,9 +16,25 @@ def bose(w, kT, hbar):
 def ohmic_exp(w, eta, wc):
     return eta*w*np.exp(-w/wc)
 
+@jit(complex128(double, double, double),nopython=True)
+def ohmic_exp_zero_T_bcf_t(t, eta, wc):
+    re_bcf_t = eta*wc**2.*(1.-wc**2.*t**2.)/(1.+wc**2.*t**2.)**2.
+    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
+    return re_bcf_t - 1.j*im_bcf_t
+
+@jit(double(double, double, double),nopython=True)
+def ohmic_exp_im_bath_corr_bose(t, eta, wc):
+    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
+    return im_bcf_t
+
 @jit(double(double, double, double),nopython=True)
 def debye(w, eta, wc):
     return eta*w/(w**2. + wc**2.)
+
+@jit(double(double, double, double),nopython=True)
+def debye_im_bath_corr_bose(t, eta, wc):
+    im_bcf_t = 0.5*np.pi*eta*np.exp(-wc*t)
+    return im_bcf_t
 
 def switch(w, wstar):
     """A smooth switching function for spectral density decompositions.
@@ -103,24 +119,33 @@ class Bath(object):
         """Compute Fourier-Laplace integral of bath correlation function up to 
         some time t.
 
-        Uses clever code from pyrho - https://github.com/berkelbach-group/pyrho
+        Uses inspiration from pyrho - https://github.com/berkelbach-group/pyrho
 
         Notes
         -----
         \int_0^t ds e^{i omega s} C(s)
         """
-        # NOTE: integration when kT != 0 is bad, need to fix
+        def bath_corr_bose(w):
+            if w==0:
+                return self.J0*self.kT
+            else:
+                return const.hbar*(2.*bose(w,self.kT,const.hbar)+1.)*self.J_omega(w)
         if self.kT == 0:
             return (1.0/np.pi)*self.zero_T_bcf_t(t)
         else:
-            re_Ct = quad(self.real_bath_corr,
-                                    -self.omega_inf, self.omega_inf,
-                                    limit=1000, weight='cos', wvar=t)
-            im_Ct = quad(self.real_bath_corr, 
-                                    -self.omega_inf, self.omega_inf,
-                                    limit=1000, weight='sin', wvar=t)
-            re_Ct, im_Ct = re_Ct[0], -im_Ct[0]
-            return (0.5/np.pi)*(re_Ct - 1.j*im_Ct)
+            #NOTE: don't integrate to infinity for numerical stability
+            re_Ct = quad(bath_corr_bose, 0.0, self.omega_inf, limit=1000, weight='cos', wvar=t)
+            im_Ct = self.im_bath_corr_bose(t)
+            #NOTE: this is what pyrho has
+            #re_Ct = quad(self.real_bath_corr, 
+            #                        -self.omega_inf, self.omega_inf,
+            #                        limit=1000, weight='cos', wvar=t)
+            #im_Ct = quad(self.real_bath_corr, 
+            #                        -self.omega_inf, self.omega_inf,
+            #                        limit=1000, weight='sin', wvar=t)
+            #re_Ct, im_Ct = re_Ct[0], -im_Ct[0]
+            re_Ct = re_Ct[0]
+            return (1.0/np.pi)*(re_Ct - 1.j*im_Ct)
 
     def compute_omegas(self, nmodes):
         """
@@ -173,9 +198,10 @@ class OhmicExp(Bath):
         return ohmic_exp(w,self.eta,self.wc)
 
     def zero_T_bcf_t(self, t):
-        re_bcf_t = self.eta*self.wc**2.*(1.-self.wc**2.*t**2.)/(1.+self.wc**2.*t**2.)**2.
-        im_bcf_t = 2.*self.eta*self.wc**3.*t/(1.+self.wc**2.*t**2.)**2.
-        return re_bcf_t - 1.j*im_bcf_t
+        return ohmic_exp_zero_T_bcf_t(t,self.eta,self.wc)
+
+    def im_bath_corr_bose(self, t):
+        return ohmic_exp_im_bath_corr_bose(t,self.eta,self.wc)
 
     @property
     def spectral_density_limit_at_zero(self):
@@ -213,6 +239,9 @@ class DebyeBath(Bath):
 
     def zero_T_bcf_t(self, t):
         raise NotImplementedError
+
+    def im_bath_corr_bose(self, t):
+        return debye_im_bath_corr_bose(t,self.eta,self.wc)
 
     @property
     def spectral_density_limit_at_zero(self):
