@@ -1,6 +1,8 @@
 from __future__ import print_function,absolute_import
 
 import numpy as np
+from time import time
+
 import qdynos.constants as const
 
 from .integrator import Integrator
@@ -51,8 +53,8 @@ class UnitaryDM(Dynamics):
                 assert(str(type(self.ham))=="<class 'qdynos.hamiltonian.MDHamiltonian'>")
                 self.results.map_function = self.ham.compute_coordinate_surfaces
 
-    def eom(self, state):
-        return self.equation_of_motion(state)
+    def eom(self, state, order):
+        return self.equation_of_motion(state, order)
 
     def solve(self, rho0, times, options=None, results=None):
         """
@@ -60,6 +62,7 @@ class UnitaryDM(Dynamics):
         """
         self.setup(options, results)
         self.dt = times[1]-times[0]
+        tobs = len(times)
         rho = rho0.copy()
 
         if self.options.method == 'exact':
@@ -70,17 +73,28 @@ class UnitaryDM(Dynamics):
             self.equation_of_motion = lambda x: self.prop*x
             ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(rho, times[0])
-            for i,time in enumerate(times):
+            for i,tau in enumerate(times):
+                if self.options.progress:
+                    if i%int(tobs/10)==0:
+                        etime = time()
+                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                    elif self.options.really_verbose: print(i)
                 if i%self.results.every==0:
-                    self.results.analyze_state(i, time, ode.y)
+                    self.results.analyze_state(i, tau, ode.y)
                 ode.integrate()
         else:
-            self.equation_of_motion = lambda x: (-1.j/const.hbar)*self.ham.commutator(x)
+            self.equation_of_motion = (lambda x,y: (-1.j/const.hbar)*self.ham.commutator(x, eig=False))
             ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(rho, times[0])
-            for i,time in enumerate(times):
+            btime = time()
+            for i,tau in enumerate(times):
+                if self.options.progress:
+                    if i%int(tobs/10)==0:
+                        etime = time()
+                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                    elif self.options.really_verbose: print(i)
                 if i%self.results.every==0:
-                    self.results.analyze_state(i, time, ode.y)
+                    self.results.analyze_state(i, tau, ode.y)
                 ode.integrate()
 
         return self.results
@@ -110,7 +124,7 @@ class UnitaryWF(Dynamics):
                 assert(str(type(self.ham))=="<class 'qdynos.hamiltonian.MDHamiltonian'>")
                 self.results.map_function = self.ham.compute_coordinate_surfaces
 
-    def eom(self, state, ind):
+    def eom(self, state, order):
         return np.dot(self.prop,state)
 
     def solve(self, psi0, times, options=None, results=None):
@@ -119,6 +133,7 @@ class UnitaryWF(Dynamics):
         """
         self.setup(options,results)
         self.dt = times[1]-times[0]
+        tobs = len(times)
         psi = psi0.copy()
 
         if self.options.method == 'exact':
@@ -128,20 +143,29 @@ class UnitaryWF(Dynamics):
             self.prop = np.diag(np.exp(-(1.j/const.hbar)*self.ham.ev*self.dt))
             ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(psi, times[0])
-            for i,time in enumerate(times):
+            for i,tau in enumerate(times):
+                if self.options.progress:
+                    if i%int(tobs/10)==0:
+                        etime = time()
+                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                    elif self.options.really_verbose: print(i)
                 if i%self.results.every==0:
-                    print(i)
-                    self.results.analyze_state(i, time, ode.y)
+                    self.results.analyze_state(i, tau, ode.y)
                 ode.integrate()
         else:
             self.prop = -(1.j/const.hbar)*self.ham.ham
             ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(psi, times[0])
-
-            for i,time in enumerate(times):
+            btime = time()
+            for i,tau in enumerate(times):
+                if self.options.progress:
+                    if i%int(tobs/10)==0:
+                        etime = time()
+                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                    elif self.options.really_verbose: print(i)
                 if i%self.results.every==0:
                     print(i)
-                    self.results.analyze_state(i, time, ode.y)
+                    self.results.analyze_state(i, tau, ode.y)
                 ode.integrate()
 
         return self.results
