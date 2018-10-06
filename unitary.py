@@ -146,6 +146,8 @@ class UnitaryWF(Dynamics):
             self.prop = np.diag(np.exp(-(1.j/const.hbar)*self.ham.ev*self.dt))
             ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(psi, times[0])
+            btime = time()
+            print_stage("Propagating Equation of Motion")
             for i,tau in enumerate(times):
                 if self.options.progress:
                     if i%int(tobs/10)==0:
