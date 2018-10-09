@@ -6,4 +6,4 @@ from qdynos.unitary import *
 from qdynos.redfield import *
 from qdynos.results import *
 from qdynos.options import *
-from qdynos.logging import *
+from qdynos.log import *
