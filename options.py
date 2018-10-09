@@ -7,7 +7,8 @@ class Options(object):
 
     def __init__(self, verbose=True, really_verbose=False, progress=True,
                  method='rk4', ntraj=1000, block_avg=False, nblocks=10,
-                 norm_steps=1000, norm_tol=1.e-3, seed=None, markov_time=np.inf):
+                 norm_steps=1000, norm_tol=1.e-3, seed=None, markov_time=np.inf,
+                 restart_file=None, restart=False):
 
         # program run options #
         self.verbose = verbose
@@ -18,7 +19,7 @@ class Options(object):
         assert(method in ['rk4','exact'])
         self.method = method
 
-        # redfield options #
+        # TCL2 options #
         self.markov_time = markov_time
 
         # unraveling options #
@@ -29,3 +30,7 @@ class Options(object):
         self.norm_steps = norm_steps
         self.norm_tol = norm_tol
         self.seed = seed
+
+        # unraveling options #
+        self.restart_file = restart_file
+        self.restart = restart
