@@ -11,6 +11,14 @@ def print_stage(line):
     sys.stdout.write("==> %s <=="%(line))
     sys.stdout.flush()
 
+def print_progress(percent,tau):
+    sys.stdout.write("%.0f Percent done"%(percent)+"."*10,(tau))
+    sys.stdout.flush()
+
+def print_time(tau):
+    sys.stdout.write("Elapsed time:",tau,"\n")
+    sys.stdout.flush()
+
 # TODO add classes to handle logging
 #class Log:
 #    import logging
@@ -20,4 +28,12 @@ def print_stage(line):
 #class Restart:
 #    import h5py
 #
-#    def __init__(self,):
+#    def __init__(self, file_name):
+#
+#    def write_matrix():
+#
+#    def write_vector():
+#
+#    def read_matrix():
+#
+#    def read_vector():

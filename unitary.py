@@ -10,7 +10,7 @@ from .integrator import Integrator
 from .dynamics import Dynamics
 from .options import Options
 from .results import Results
-from .log import print_method,print_stage
+from .log import print_method,print_stage,print_progress,print_time
 
 class UnitaryDM(Dynamics):
     """
@@ -79,7 +79,7 @@ class UnitaryDM(Dynamics):
                 if self.options.progress:
                     if i%int(tobs/10)==0:
                         etime = time()
-                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                        print_progress((100*i/tobs),(etime-btime))
                     elif self.options.really_verbose: print(i)
                 if i%self.results.every==0:
                     self.results.analyze_state(i, tau, ode.y)
@@ -93,7 +93,7 @@ class UnitaryDM(Dynamics):
                 if self.options.progress:
                     if i%int(tobs/10)==0:
                         etime = time()
-                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                        print_progress((100*i/tobs),(etime-btime))
                     elif self.options.really_verbose: print(i)
                 if i%self.results.every==0:
                     self.results.analyze_state(i, tau, ode.y)
@@ -152,7 +152,7 @@ class UnitaryWF(Dynamics):
                 if self.options.progress:
                     if i%int(tobs/10)==0:
                         etime = time()
-                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                        print_progress((100*i/tobs),(etime-btime))
                     elif self.options.really_verbose: print(i)
                 if i%self.results.every==0:
                     self.results.analyze_state(i, tau, ode.y)
@@ -167,10 +167,9 @@ class UnitaryWF(Dynamics):
                 if self.options.progress:
                     if i%int(tobs/10)==0:
                         etime = time()
-                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                        print_progress((100*i/tobs),(etime-btime))
                     elif self.options.really_verbose: print(i)
                 if i%self.results.every==0:
-                    print(i)
                     self.results.analyze_state(i, tau, ode.y)
                 ode.integrate()
 

@@ -10,7 +10,7 @@ from .dynamics import Dynamics
 from .utils import commutator,dag,to_liouville
 from .options import Options
 from .results import Results
-from .log import print_method,print_stage
+from .log import print_method,print_stage,print_progress,print_time
 
 class Redfield(Dynamics):
     """Dynamics class for Redfield-like dynamics. Can perform both 
@@ -199,7 +199,7 @@ class Redfield(Dynamics):
             if self.options.verbose:
                 etime = time()
                 print_stage("Finished Constructing Operators")
-                print("Elapsed time:",etime-btime,"\n")
+                print_time(etime-btime)
                 print_stage("Propagating Equation of Motion")
         for i in range(len(self.results.e_ops)):
             self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])[:ntrunc,:ntrunc]
@@ -227,7 +227,7 @@ class Redfield(Dynamics):
                 if self.options.progress:
                     if i%int(tobs/10)==0:
                         etime = time()
-                        print("%.0f Percent done"%(100*i/tobs)+"."*10,(etime-btime))
+                        print_progress((100*i/tobs),(etime-btime))
                     elif self.options.really_verbose: print(i)
                 if self.time_dep:
                     self.update_ops(tau)
