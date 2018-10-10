@@ -68,9 +68,9 @@ class Results(object):
         if self.e_ops != None:
             if self.print_es:
                 if es_file==None:
-                    self.fes = open('output.dat','w')
+                    self.fes = open('output.dat','w', buffering=1)
                 else:
-                    self.fes = open(es_file,'w')
+                    self.fes = open(es_file,'w', buffering=1)
             else:
                 self.expect = np.zeros((len(self.e_ops),tobs))
         # mapping expectation value containers #
@@ -86,12 +86,18 @@ class Results(object):
         self.print_states = print_states
         self.states_file = None
         if self.print_states:
-            self.states_file = open(states_file, 'w')
+            self.states_file = open(states_file, 'w', buffering=1)
         # jump statistics containers #
         self.jumps = None
         self.jump_times = None
         if jump_stats:
             self.jumps = list()
+
+    def close_down(self):
+        if self.fes != None and self.fes.closed == False:
+            self.fes.close()
+        if self.states_file != None and self.states_file.closed == False:
+            self.states_file.close()
 
     def compute_expectation(self, ind, state):
         """
@@ -148,6 +154,8 @@ class Results(object):
             self.compute_expectation(ind, state)
         if self.map_ops:
             self.mapping_expect(state)
+        if ind==(tobs-1):
+            self.close_down()
 
     def store_jumps(self, njumps, jumps):
         self.jumps.append( [njumps, jumps.copy()] )
