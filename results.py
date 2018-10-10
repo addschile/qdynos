@@ -58,6 +58,7 @@ class Results(object):
         jump_stats: bool
         every: int
         """
+        self.tobs = tobs
         # how often do we compute results #
         self.every = every
         # expectation value containers #
@@ -154,7 +155,7 @@ class Results(object):
             self.compute_expectation(ind, state)
         if self.map_ops:
             self.mapping_expect(state)
-        if ind==(tobs-1):
+        if ind==(self.tobs-1):
             self.close_down()
 
     def store_jumps(self, njumps, jumps):
