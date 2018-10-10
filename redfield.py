@@ -10,7 +10,7 @@ from .dynamics import Dynamics
 from .utils import commutator,dag,to_liouville
 from .options import Options
 from .results import Results
-from .logging import print_method,print_stage
+from .log import print_method,print_stage
 
 class Redfield(Dynamics):
     """Dynamics class for Redfield-like dynamics. Can perform both 

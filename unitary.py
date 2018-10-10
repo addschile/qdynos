@@ -10,7 +10,7 @@ from .integrator import Integrator
 from .dynamics import Dynamics
 from .options import Options
 from .results import Results
-from .logging import print_method,print_stage
+from .log import print_method,print_stage
 
 class UnitaryDM(Dynamics):
     """
