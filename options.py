@@ -1,4 +1,5 @@
 import numpy as np
+from .log import Restart
 
 class Options(object):
     """
@@ -8,7 +9,7 @@ class Options(object):
     def __init__(self, verbose=True, really_verbose=False, progress=True,
                  method='rk4', ntraj=1000, block_avg=False, nblocks=10,
                  norm_steps=1000, norm_tol=1.e-3, seed=None, markov_time=np.inf,
-                 restart_file=None, restart=False):
+                 restart=False, restart_file=None, from_restart=False):
 
         # program run options #
         self.verbose = verbose
@@ -31,6 +32,19 @@ class Options(object):
         self.norm_tol = norm_tol
         self.seed = seed
 
-        # unraveling options #
-        self.restart_file = restart_file
+        # restart options #
         self.restart = restart
+        self.restart_file = None
+        if self.restart: 
+            if restart_file == None:
+                # instantiate generic restart class
+                self.restart_file = Restart("")
+            else:
+                # instantiate restart class with specific file name
+                self.restart_file = Restart(restart_file)
+
+        self.from_restart = from_restart
+        if restart_file == None:
+            self.restart_file = 
+        else:
+            self.restart_file = 
