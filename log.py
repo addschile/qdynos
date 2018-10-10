@@ -1,4 +1,4 @@
-import std
+import sys
 
 def print_method(line):
     nchar = len(line)
