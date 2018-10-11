@@ -163,6 +163,31 @@ class Redfield(Dynamics):
             dy += (commutator(self.E[j][order]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j][order])))/const.hbar**2.
         return dy
 
+    def propagate_eom(self, rho, times):
+
+        if self.results.e_ops != None:
+            for i in range(len(self.results.e_ops)):
+                self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])[:self.ntrunc,:self.ntrunc]
+
+        if self.options.method == 'exact':
+            raise NotImplementedError
+        else:
+            self.ode._set_y_value(rho, times[0])
+            btime = time()
+            for i,tau in enumerate(times):
+                if self.options.progress:
+                    if i%int(self.tobs/10)==0:
+                        etime = time()
+                        print_progress((100*i/self.tobs),(etime-btime))
+                    elif self.options.really_verbose: print(i)
+                if self.time_dep:
+                    self.update_ops(tau)
+                if i%self.results.every==0:
+                    self.results.analyze_state(i, tau, self.ode.y)
+                self.ode.integrate()
+
+        return self.results
+
     def solve(self, rho0, times, ntrunc=None, options=None, results=None):
         """Solve the Redfield equations of motion.
 
@@ -182,7 +207,7 @@ class Redfield(Dynamics):
         else:
             self.ntrunc = ntrunc
         self.dt = times[1]-times[0]
-        tobs = len(times)
+        self.tobs = len(times)
         self.setup(options, results)
         rho = self.ham.to_eigenbasis(rho0.copy())[:ntrunc,:ntrunc]
 
@@ -201,38 +226,5 @@ class Redfield(Dynamics):
                 print_stage("Finished Constructing Operators")
                 print_time(etime-btime)
                 print_stage("Propagating Equation of Motion")
-        for i in range(len(self.results.e_ops)):
-            self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])[:ntrunc,:ntrunc]
 
-        if self.options.method == 'exact':
-            raise NotImplementedError
-            # Redfield class setup
-            if self.time_dep:
-                raise NotImplementedError
-            else:
-                # TODO need to make exact propagator
-                self.prop = np.exp(-1.j*self.ham.omegas*dt)
-                self.equation_of_motion = lambda x: np.dot(self.prop,x)
-                rho = self.ham.to_eigenbasis(rho)
-                ode._set_y_value(rho, times[0])
-                for tau in times:
-                    if i%self.results.every==0:
-                        if self.options.progress: print(i)
-                        self.results.analyze_state(i, tau, ode.y)
-                    ode.integrate()
-        else:
-            self.ode._set_y_value(rho, times[0])
-            btime = time()
-            for i,tau in enumerate(times):
-                if self.options.progress:
-                    if i%int(tobs/10)==0:
-                        etime = time()
-                        print_progress((100*i/tobs),(etime-btime))
-                    elif self.options.really_verbose: print(i)
-                if self.time_dep:
-                    self.update_ops(tau)
-                if i%self.results.every==0:
-                    self.results.analyze_state(i, tau, self.ode.y)
-                self.ode.integrate()
-
-        return self.results
+        return self.propagate_eom(rho, times)
