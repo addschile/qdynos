@@ -36,11 +36,13 @@ class Redfield(Dynamics):
                 print_method("Secular TCL2")
             else:
                 print_method("TCL2")
+            self.equation_of_motion = self.td_rf_eom
         else:
             if self.is_secular:
                 print_method("Secular Redfield Theory")
             else:
                 print_method("Redfield Theory")
+            self.equation_of_motion = self.rf_eom
         if options==None:
             self.options = Options()
         else:
@@ -48,7 +50,9 @@ class Redfield(Dynamics):
             if self.options.method == "exact":
                 raise NotImplementedError
 
-    def setup(self, options, results):
+    def setup(self, times, results):
+        self.dt = times[1]-times[0]
+        self.tobs = len(times)
         if results==None:
             self.results = Results()
         else:
@@ -179,7 +183,7 @@ class Redfield(Dynamics):
 
         return self.results
 
-    def solve(self, rho0, times, options=None, results=None):
+    def solve(self, rho0, times, results=None):
         """Solve the Redfield equations of motion.
 
         Parameters
@@ -193,9 +197,7 @@ class Redfield(Dynamics):
         -------
         results : Results class
         """
-        self.dt = times[1]-times[0]
-        self.tobs = len(times)
-        self.setup(options, results)
+        self.setup(times, results)
         rho = self.ham.to_eigenbasis(rho0.copy())
 
         if self.options.method != "exact":
@@ -204,10 +206,8 @@ class Redfield(Dynamics):
                 btime = time()
             if self.time_dep:
                 self.coupling_operators_setup()
-                self.equation_of_motion = self.td_rf_eom
             else:
                 self.make_redfield_operators()
-                self.equation_of_motion = self.rf_eom
             if self.options.verbose:
                 etime = time()
                 print_stage("Finished Constructing Operators")
