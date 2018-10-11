@@ -18,7 +18,7 @@ class Redfield(Dynamics):
     secular approximation.
     """
 
-    def __init__(self, ham, time_dependent=False, is_secular=False):
+    def __init__(self, ham, time_dependent=False, is_secular=False, options=None):
         """Instantiates the Redfield class.
 
         Parameters
@@ -41,15 +41,14 @@ class Redfield(Dynamics):
                 print_method("Secular Redfield Theory")
             else:
                 print_method("Redfield Theory")
-
-    def setup(self, options, results):
-        # generic setup
         if options==None:
             self.options = Options()
         else:
             self.options = options
             if self.options.method == "exact":
                 raise NotImplementedError
+
+    def setup(self, options, results):
         if results==None:
             self.results = Results()
         else:
@@ -82,8 +81,8 @@ class Redfield(Dynamics):
                     if i!=j:
                         theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
             Ga_plus = Ga*theta_plus
-            self.C.append(Ga.copy()[:self.ntrunc,:self.ntrunc])
-            self.E.append(Ga_plus.copy()[:self.ntrunc,:self.ntrunc])
+            self.C.append(Ga.copy())
+            self.E.append(Ga_plus.copy())
 
     def coupling_operators_setup(self):
         """Make coupling operators and initialize "dressing" for copuling 
@@ -92,11 +91,11 @@ class Redfield(Dynamics):
         self.C = []
         self.gamma_n = [[]]*self.ham.nbaths
         self.gamma_n_1 = [[]]*self.ham.nbaths
-        ns = self.ntrunc
+        nstates = self.ham.nstates
         b = self.ode.b
 
         for op,bath in enumerate(self.ham.baths):
-            self.C.append( self.ham.to_eigenbasis( bath.c_op )[:self.ntrunc,:self.ntrunc] )
+            self.C.append( self.ham.to_eigenbasis( bath.c_op ) )
             self.gamma_n[op] = list()
             self.gamma_n_1[op] = list()
 
@@ -104,11 +103,11 @@ class Redfield(Dynamics):
             for k in range(self.ode.order):
                 t = b[k]*self.dt
                 if k==0:
-                    self.gamma_n[op].append( np.zeros((self.ntrunc,self.ntrunc),dtype=complex) )
-                    theta_plus = np.exp(-1.j*self.ham.omegas[:self.ntrunc,:self.ntrunc]*0.0)*bath.bath_corr_t(0.0)
+                    self.gamma_n[op].append( np.zeros((nstates,nstates),dtype=complex) )
+                    theta_plus = np.exp(-1.j*self.ham.omegas*0.0)*bath.bath_corr_t(0.0)
                     self.gamma_n_1[op].append(theta_plus.copy())
                 else:
-                    theta_plus = np.exp(-1.j*self.ham.omegas[:self.ntrunc,:self.ntrunc]*t)*bath.bath_corr_t(t)
+                    theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
                     self.gamma_n[op].append( self.gamma_n[op][k-1] + 0.5*(b[k]-b[k-1])*self.dt*(theta_plus + self.gamma_n_1[op][k-1]) )
                     self.gamma_n_1[op].append( theta_plus.copy() )
 
@@ -120,7 +119,7 @@ class Redfield(Dynamics):
         for op,bath in enumerate(self.ham.baths):
             for k in range(self.ode.order):
                 t = time + b[k]*self.dt
-                theta_plus = np.exp(-1.j*self.ham.omegas[:self.ntrunc,:self.ntrunc]*t)*bath.bath_corr_t(t)
+                theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
                 if k==0:
                     self.gamma_n[op][k] = self.gamma_n[op][-1].copy()
                     self.gamma_n_1[op][k] = theta_plus.copy()
@@ -144,21 +143,13 @@ class Redfield(Dynamics):
         return self.equation_of_motion(state, order)
 
     def rf_eom(self, state, order):
-        # TODO unbiased test
-        #dy = (-1.j/const.hbar)*self.ham.Heig[:self.ntrunc,:self.ntrunc]@state
-        #dy -= (-1.j/const.hbar)*state@self.ham.Heig[:self.ntrunc,:self.ntrunc]
-        #for j in range(len(self.ham.baths)):
-            #dy += self.E[j]@state@self.C[j]/const.hbar**2.
-            #dy -= self.C[j]@self.E[j]@state/const.hbar**2.
-            #dy += self.C[j]@state@dag(self.E[j])/const.hbar**2.
-            #dy -= state@dag(self.E[j])@self.C[j]/const.hbar**2.
-        dy = (-1.j/const.hbar)*self.ham.commutator(state, ntrunc=self.ntrunc)
+        dy = (-1.j/const.hbar)*self.ham.commutator(state)
         for j in range(len(self.ham.baths)):
             dy += (commutator(self.E[j]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j])))/const.hbar**2.
         return dy
 
     def td_rf_eom(self, state, order):
-        dy = (-1.j/const.hbar)*self.ham.commutator(state, ntrunc=self.ntrunc)
+        dy = (-1.j/const.hbar)*self.ham.commutator(state)
         for j in range(len(self.ham.baths)):
             dy += (commutator(self.E[j][order]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j][order])))/const.hbar**2.
         return dy
@@ -167,7 +158,7 @@ class Redfield(Dynamics):
 
         if self.results.e_ops != None:
             for i in range(len(self.results.e_ops)):
-                self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])[:self.ntrunc,:self.ntrunc]
+                self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
 
         if self.options.method == 'exact':
             raise NotImplementedError
@@ -188,7 +179,7 @@ class Redfield(Dynamics):
 
         return self.results
 
-    def solve(self, rho0, times, ntrunc=None, options=None, results=None):
+    def solve(self, rho0, times, options=None, results=None):
         """Solve the Redfield equations of motion.
 
         Parameters
@@ -202,14 +193,10 @@ class Redfield(Dynamics):
         -------
         results : Results class
         """
-        if ntrunc==None:
-            self.ntrunc = self.ham.nstates
-        else:
-            self.ntrunc = ntrunc
         self.dt = times[1]-times[0]
         self.tobs = len(times)
         self.setup(options, results)
-        rho = self.ham.to_eigenbasis(rho0.copy())[:ntrunc,:ntrunc]
+        rho = self.ham.to_eigenbasis(rho0.copy())
 
         if self.options.method != "exact":
             if self.options.verbose:
