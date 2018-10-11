@@ -50,7 +50,6 @@ class Hamiltonian(object):
     def eigensystem(self):
         self.ev,self.ek = np.linalg.eigh(self.ham)
         self.ev = self.ev[:nstates]
-        self.ek = self.ek[:nstates,:nstates]
         self.compute_frequencies()
 
     def compute_frequencies(self):
@@ -62,17 +61,17 @@ class Hamiltonian(object):
 
     def to_eigenbasis(self, op):
         if is_vector(op):
-            return np.dot(dag(self.ek), op)
+            return np.dot(dag(self.ek), op)[:self.nstates,:]
         elif is_matrix(op):
-            return np.dot(dag(self.ek), np.dot(op, self.ek))
+            return np.dot(dag(self.ek), np.dot(op, self.ek))[:self.nstates,:nstates]
         else:
             raise AttributeError("Not a valid operator")
 
-    def from_eigenbasis(self, op):
+    def from_eigenbasis(self, op, trunc=True):
         if is_vector(op):
-            return np.dot(self.ek, op)
+            return np.dot(self.ek, op)[:self.nstates,:]
         elif is_matrix(op):
-            return np.dot(self.ek, np.dot(op, dag(self.ek)))
+            return np.dot(self.ek, np.dot(op, dag(self.ek)))[:self.nstates,:nstates]
         else:
             raise AttributeError("Not a valid operator")
 
