@@ -8,15 +8,15 @@ def print_method(line):
     sys.stdout.flush()
 
 def print_stage(line):
-    sys.stdout.write("==> %s <=="%(line))
+    sys.stdout.write("==> %s <==\n"%(line))
     sys.stdout.flush()
 
 def print_progress(percent,tau):
-    sys.stdout.write("%.0f Percent done"%(percent)+"."*10,(tau))
+    sys.stdout.write("%.0f Percent done"%(percent)+"."*10+"%.8f\n"%(tau))
     sys.stdout.flush()
 
 def print_time(tau):
-    sys.stdout.write("Elapsed time:",tau,"\n")
+    sys.stdout.write("Elapsed time: %.8f\n"%(tau))
     sys.stdout.flush()
 
 # TODO add classes to handle logging
