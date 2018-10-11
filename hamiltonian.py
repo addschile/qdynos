@@ -8,18 +8,23 @@ class Hamiltonian(object):
     Base Hamiltonian class.
     """
 
-    def __init__(self, H, baths=None, hbar=1.):
+    def __init__(self, H, nstates=None, baths=None, hbar=1.):
         """
         Parameters
         ----------
         H: np.ndarray
             Hamiltonian matrix
+        nstates: int
+            Number that specifies the size of Hilbert space
         bath: list of Bath classes
             Baths that independently couple to the system
         hbar: float
         """
         const.hbar = hbar
-        self.nstates = H.shape[0]
+        if nstates==None:
+            self.nstates = H.shape[0]
+        else:
+            self.nstates = nstates
         self.check_hermiticity(H)
         self.ham = H
         self.eigensystem()
@@ -44,6 +49,8 @@ class Hamiltonian(object):
 
     def eigensystem(self):
         self.ev,self.ek = np.linalg.eigh(self.ham)
+        self.ev = self.ev[:nstates]
+        self.ek = self.ek[:nstates,:nstates]
         self.compute_frequencies()
 
     def compute_frequencies(self):
@@ -53,9 +60,7 @@ class Hamiltonian(object):
     def compute_unique_freqs(self):
         self.frequencies = np.unique(self.omegas)
 
-    def to_eigenbasis(self, op, ntrunc=None):
-        if ntrunc==None:
-            ntrunc = self.nstates
+    def to_eigenbasis(self, op):
         if is_vector(op):
             return np.dot(dag(self.ek), op)
         elif is_matrix(op):
@@ -71,13 +76,13 @@ class Hamiltonian(object):
         else:
             raise AttributeError("Not a valid operator")
 
-    def commutator(self, op, eig=True, ntrunc=None):
+    def commutator(self, op, eig=True):
         if ntrunc==None:
             ntrunc = self.nstates
         if eig:
-            return self.Heig[:ntrunc,:ntrunc]@op - op@self.Heig[:ntrunc,:ntrunc]
+            return self.Heig@op - op@self.Heig
         else:
-            return self.ham[:ntrunc,:ntrunc]@op - op@self.ham[:ntrunc,:ntrunc]
+            return self.ham@op - op@self.ham
 
     """
     def thermal_dm(self):
