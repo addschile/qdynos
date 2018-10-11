@@ -36,13 +36,11 @@ class Redfield(Dynamics):
                 print_method("Secular TCL2")
             else:
                 print_method("TCL2")
-            self.equation_of_motion = self.td_rf_eom
         else:
             if self.is_secular:
                 print_method("Secular Redfield Theory")
             else:
                 print_method("Redfield Theory")
-            self.equation_of_motion = self.rf_eom
         if options==None:
             self.options = Options()
         else:
