@@ -73,7 +73,7 @@ class Redfield(Dynamics):
         self.C = list()
         self.E = list()
         for k,bath in enumerate(self.ham.baths):
-            if self.options.really_verbose: print("operator %d of %d"%(k,len(self.ham.baths)))
+            if self.options.really_verbose: print("operator %d of %d"%(k+1,len(self.ham.baths)))
             Ga = self.ham.to_eigenbasis( bath.c_op )
             theta_zero = bath.ft_bath_corr(0.0)
             theta_plus = theta_zero*np.identity(nstates,dtype=complex)
