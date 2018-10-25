@@ -2,12 +2,13 @@ from __future__ import print_function,absolute_import
 
 import numpy as np
 from time import time
+from scipy.linalg import expm
 
 import qdynos.constants as const
 
 from .integrator import Integrator
 from .dynamics import Dynamics
-from .utils import commutator,dag,to_liouville
+from .utils import commutator,dag,to_liouville,from_liouville
 from .options import Options
 from .results import Results
 from .log import print_method,print_stage,print_progress,print_time
@@ -20,7 +21,6 @@ class Redfield(Dynamics):
 
     def __init__(self, ham, time_dependent=False, is_secular=False, options=None):
         """Instantiates the Redfield class.
-
         Parameters
         ----------
         ham : Hamiltonian or MDHamiltonian class
@@ -46,7 +46,8 @@ class Redfield(Dynamics):
         else:
             self.options = options
             if self.options.method == "exact":
-                raise NotImplementedError
+                if self.time_dep:
+                    raise NotImplementedError
 
     def setup(self, times, results):
         self.dt = times[1]-times[0]
@@ -64,14 +65,26 @@ class Redfield(Dynamics):
             if self.time_dep:
                 self.equation_of_motion = self.td_rf_eom
             else:
-                self.equation_of_motion = self.rf_eom
+                if self.options.space == 'hilbert':
+                    self.equation_of_motion = self.rf_eom
+                elif self.options.space == 'liouville':
+                    self.equation_of_motion = self.super_rf_eom
+        else:
+            if self.time_dep:
+                raise NotImplementedError
+            else:
+                self.equation_of_motion = self.super_rf_eom
 
     def make_redfield_operators(self):
         """Make and store the coupling operators and "dressed" copuling operators.
         """
         nstates = self.ham.nstates
-        self.C = list()
-        self.E = list()
+        if self.options.space == "hilbert":
+            self.C = list()
+            self.E = list()
+        elif self.options.space == "liouville" or self.options.method == "exact":
+            gamma_plus  = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
+            gamma_minus = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
         for k,bath in enumerate(self.ham.baths):
             if self.options.really_verbose: print("operator %d of %d"%(k+1,len(self.ham.baths)))
             Ga = self.ham.to_eigenbasis( bath.c_op )
@@ -82,9 +95,20 @@ class Redfield(Dynamics):
                 for j in range(nstates):
                     if i!=j:
                         theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
-            Ga_plus = Ga*theta_plus
-            self.C.append(Ga.copy())
-            self.E.append(Ga_plus.copy())
+            if self.options.space == "hilbert":
+                Ga_plus = Ga*theta_plus
+                self.C.append(Ga.copy())
+                self.E.append(Ga_plus.copy())
+            elif self.options.space == "liouville" or self.options.method == "exact":
+                gamma_plus  += np.einsum('lj,ik,ik->ljik', Ga, Ga, theta_plus)
+                gamma_minus += np.einsum('lj,ik,lj->ljik', Ga, Ga, theta_plus.conj().T)
+        if self.options.space == "liouville" or self.options.method == "exact":
+            self.R = (gamma_plus.transpose(2,1,3,0) + gamma_minus.transpose(2,1,3,0) -\
+                     np.einsum('lj,irrk->ijkl', np.identity(nstates), gamma_plus) -\
+                     np.einsum('ik,lrrj->ijkl', np.identity(nstates), gamma_minus))
+            self.Omega = -1.j*np.einsum('ij,ik,jl->ijkl', self.ham.omegas,
+                                   np.identity(nstates), np.identity(nstates))
+            self.prop = to_liouville(self.Omega) + to_liouville(self.R)/const.hbar**2.
 
     def coupling_operators_setup(self):
         """Make coupling operators and initialize "dressing" for copuling 
@@ -144,6 +168,9 @@ class Redfield(Dynamics):
     def eom(self, state, order):
         return self.equation_of_motion(state, order)
 
+    def super_rf_eom(self, state, order):
+        return np.dot(self.prop , state)
+
     def rf_eom(self, state, order):
         dy = (-1.j/const.hbar)*self.ham.commutator(state)
         for j in range(len(self.E)):
@@ -162,35 +189,35 @@ class Redfield(Dynamics):
             for i in range(len(self.results.e_ops)):
                 self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
 
-        if self.options.method == 'exact':
-            raise NotImplementedError
-        else:
-            self.ode._set_y_value(rho, times[0])
-            btime = time()
-            for i,tau in enumerate(times):
-                if self.options.progress:
-                    if i%int(self.tobs/10)==0:
-                        etime = time()
-                        print_progress((100*i/self.tobs),(etime-btime))
-                    elif self.options.really_verbose: print(i)
-                if self.time_dep:
-                    self.update_ops(tau)
-                if i%self.results.every==0:
+        if self.options.space == "liouville" or self.options.method == "exact":
+            rho = to_liouville(rho)
+        self.ode._set_y_value(rho, times[0])
+        btime = time()
+        for i,tau in enumerate(times):
+            if self.options.progress:
+                if i%int(self.tobs/10)==0:
+                    etime = time()
+                    print_progress((100*i/self.tobs),(etime-btime))
+                elif self.options.really_verbose: print(i)
+            if self.time_dep:
+                self.update_ops(tau)
+            if i%self.results.every==0:
+                if self.options.space == "hilbert":
                     self.results.analyze_state(i, tau, self.ode.y)
-                self.ode.integrate()
+                elif self.options.space == "liouville" or self.options.method == "exact":
+                    self.results.analyze_state(i, tau, from_liouville(self.ode.y))
+            self.ode.integrate()
 
         return self.results
 
     def solve(self, rho0, times, results=None):
         """Solve the Redfield equations of motion.
-
         Parameters
         ----------
         rho_0 : np.array
         times : np.array
         options : Options class
         results : Results class
-
         Returns
         -------
         results : Results class
@@ -198,18 +225,20 @@ class Redfield(Dynamics):
         self.setup(times, results)
         rho = self.ham.to_eigenbasis(rho0.copy())
 
-        if self.options.method != "exact":
-            if self.options.verbose:
-                print_stage("Initializing Coupling Operators")
-                btime = time()
-            if self.time_dep:
+        if self.options.verbose:
+            print_stage("Initializing Coupling Operators")
+            btime = time()
+        if self.time_dep:
+            if self.options.method != "exact":
                 self.coupling_operators_setup()
-            else:
-                self.make_redfield_operators()
-            if self.options.verbose:
-                etime = time()
-                print_stage("Finished Constructing Operators")
-                print_time(etime-btime)
-                print_stage("Propagating Equation of Motion")
+        else:
+            self.make_redfield_operators()
+            if self.options.method == "exact":
+                self.prop = expm(self.dt*self.prop)
+        if self.options.verbose:
+            etime = time()
+            print_stage("Finished Constructing Operators")
+            print_time(etime-btime)
+            print_stage("Propagating Equation of Motion")
 
         return self.propagate_eom(rho, times)
