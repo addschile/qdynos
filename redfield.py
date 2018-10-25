@@ -61,19 +61,22 @@ class Redfield(Dynamics):
                 self.results.map_function = self.ham.compute_coordinate_surfaces
 
         self.ode = Integrator(self.dt, self.eom, self.options)
-        if self.options.method != "exact":
+        if self.options.method == "exact":
             if self.time_dep:
-                self.equation_of_motion = self.td_rf_eom
+                raise NotImplementedError
+            else:
+                self.equation_of_motion = self.super_rf_eom
+        else:
+            if self.time_dep:
+                if self.options.space == 'hilbert':
+                    self.equation_of_motion = self.td_rf_eom
+                elif self.options.space == 'liouville':
+                    self.equation_of_motion = self.super_td_rf_eom
             else:
                 if self.options.space == 'hilbert':
                     self.equation_of_motion = self.rf_eom
                 elif self.options.space == 'liouville':
                     self.equation_of_motion = self.super_rf_eom
-        else:
-            if self.time_dep:
-                raise NotImplementedError
-            else:
-                self.equation_of_motion = self.super_rf_eom
 
     def make_redfield_operators(self):
         """Make and store the coupling operators and "dressed" copuling operators.
@@ -82,7 +85,7 @@ class Redfield(Dynamics):
         if self.options.space == "hilbert":
             self.C = list()
             self.E = list()
-        elif self.options.space == "liouville" or self.options.method == "exact":
+        elif self.options.space == "liouville":
             gamma_plus  = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
             gamma_minus = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
         for k,bath in enumerate(self.ham.baths):
@@ -99,10 +102,10 @@ class Redfield(Dynamics):
                 Ga_plus = Ga*theta_plus
                 self.C.append(Ga.copy())
                 self.E.append(Ga_plus.copy())
-            elif self.options.space == "liouville" or self.options.method == "exact":
+            elif self.options.space == "liouville":
                 gamma_plus  += np.einsum('lj,ik,ik->ljik', Ga, Ga, theta_plus)
                 gamma_minus += np.einsum('lj,ik,lj->ljik', Ga, Ga, theta_plus.conj().T)
-        if self.options.space == "liouville" or self.options.method == "exact":
+        if self.options.space == "liouville":
             self.R = (gamma_plus.transpose(2,1,3,0) + gamma_minus.transpose(2,1,3,0) -\
                      np.einsum('lj,irrk->ijkl', np.identity(nstates), gamma_plus) -\
                      np.einsum('ik,lrrj->ijkl', np.identity(nstates), gamma_minus))
@@ -136,6 +139,10 @@ class Redfield(Dynamics):
                     theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
                     self.gamma_n[op].append( self.gamma_n[op][k-1] + 0.5*(b[k]-b[k-1])*self.dt*(theta_plus + self.gamma_n_1[op][k-1]) )
                     self.gamma_n_1[op].append( theta_plus.copy() )
+        if self.options.space == "liouville":
+            self.Omega = -1.j*np.einsum('ij,ik,jl->ijkl', self.ham.omegas,
+                                   np.identity(nstates), np.identity(nstates))
+            self.Omega = to_liouville(self.Omega)
 
     def make_tcl2_operators(self, time):
         """Integrate "dressing" for copuling operators. Uses trapezoid rule 
@@ -157,11 +164,25 @@ class Redfield(Dynamics):
         """Update the dressed coupling operators by integrating Fourier-Laplace
         transform of bath correlation function in time.
         """
-        self.E = [[]]*self.ham.nbaths
-        for i in range(len(self.C)):
-            self.E[i] = list()
-            for j in range(self.ode.order):
-                self.E[i].append(self.gamma_n[i][j]*self.C[i])
+        if self.options.space == "hilbert":
+            self.E = [[]]*self.ham.nbaths
+            for i in range(len(self.C)):
+                self.E[i] = list()
+                for j in range(self.ode.order):
+                    self.E[i].append(self.gamma_n[i][j]*self.C[i])
+        elif self.options.space == "liouville":
+            nstates = self.ham.nstates
+            self.prop = list()
+            for i in range(self.ode.order):
+                gamma_plus  = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
+                gamma_minus = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
+                for j in range(len(self.C)):
+                    gamma_plus  += np.einsum('lj,ik,ik->ljik', self.C[j], self.C[j], self.gamma_n[j][i])
+                    gamma_minus += np.einsum('lj,ik,lj->ljik', self.C[j], self.C[j], self.gamma_n[j][i].conj().T)
+                R = (gamma_plus.transpose(2,1,3,0) + gamma_minus.transpose(2,1,3,0) -\
+                    np.einsum('lj,irrk->ijkl', np.identity(nstates), gamma_plus) -\
+                    np.einsum('ik,lrrj->ijkl', np.identity(nstates), gamma_minus))
+                self.prop.append( self.Omega + to_liouville(R.copy())/const.hbar**2. )
         if time < self.options.markov_time:
             self.make_tcl2_operators(time)
 
@@ -176,6 +197,9 @@ class Redfield(Dynamics):
         for j in range(len(self.E)):
             dy += (commutator(self.E[j]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j])))/const.hbar**2.
         return dy
+
+    def super_td_rf_eom(self, state, order):
+        return np.dot(self.prop[order] , state)
 
     def td_rf_eom(self, state, order):
         dy = (-1.j/const.hbar)*self.ham.commutator(state)
