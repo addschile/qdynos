@@ -6,9 +6,9 @@ class Options(object):
     """
 
     def __init__(self, verbose=True, really_verbose=False, progress=True,
-                 method='rk4', ntraj=1000, block_avg=False, nblocks=10,
-                 norm_steps=1000, norm_tol=1.e-3, seed=None, markov_time=np.inf,
-                 restart_file=None, restart=False):
+                 method="rk4", space="hilbert", ntraj=1000, block_avg=False, 
+                 nblocks=10, norm_steps=1000, norm_tol=1.e-3, seed=None, 
+                 markov_time=np.inf, restart_file=None, restart=False):
 
         # program run options #
         self.verbose = verbose
@@ -18,6 +18,12 @@ class Options(object):
         # integrator options #
         assert(method in ['rk4','exact'])
         self.method = method
+
+        # liouville or hilbert space #
+        if self.method != "exact":
+            self.space = space
+        else:
+            self.space = "liouville"
 
         # TCL2 options #
         self.markov_time = markov_time
