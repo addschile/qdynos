@@ -81,15 +81,13 @@ class Hamiltonian(object):
         else:
             return self.ham@op - op@self.ham
 
-    """
     def thermal_dm(self):
-        if bath!=None
+        if self.baths != None:
             rho_eq = np.zeros((self.nstates,self.nstates), dtype=complex)
-            rho_eq += np.diag(np.exp(-self.ev/bath.kT))
+            rho_eq += np.diag(np.exp(-self.ev/self.baths[0].kT))
             return rho_eq/np.trace(rho_eq)
         else:
             raise NotImplementedError("Bath must be initialized before calling")
-    """
 
 class MDHamiltonian(Hamiltonian):
     """
