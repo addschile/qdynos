@@ -36,6 +36,14 @@ def debye_im_bath_corr_bose(t, eta, wc, hbar):
     im_bcf_t = 0.5*np.pi*eta*np.exp(-wc*t)
     return hbar*im_bcf_t
 
+@jit(double(double,double[:],double[:],double[:]),nopython=True)
+def mt_decomp(w,pk,omk,gamk):
+    return 0.5*np.pi*np.sum((pk*w/( ((w+omk)**2. + gamk**2.)*((w-omk)**2. + gamk**2.) ))[:])
+
+@jit(double(double,double[:],double[:],double[:],double),nopython=True)
+def mt_decomp_im_bath_corr_bose(t,pk,omk,gamk,hbar):
+    return (np.pi**2./8.)*np.sum((np.exp(-gamk*t)*pk*np.sin(omk*t)/(gamk*omk))[:])
+
 def switch(w, wstar):
     """A smooth switching function for spectral density decompositions.
     """
@@ -187,6 +195,7 @@ class OhmicExp(Bath):
     J(\omega) = \eta \omega e^{- \omega / \omega_c}
     """
     def __init__(self, eta, wc, kT, op=None):
+        self.type = "ohmic exponential"
         self.eta = eta
         self.wc = wc
         self.omega_inf = 20.*wc
@@ -227,6 +236,7 @@ class DebyeBath(Bath):
     J(\omega) = \eta \omega / (\omega^2 + \omega_c^2)
     """
     def __init__(self, eta, wc, kT, op=None):
+        self.type = "debye"
         self.eta = eta
         self.wc = wc
         self.omega_inf = 20.*wc
@@ -258,31 +268,70 @@ class DebyeBath(Bath):
         c_ns = np.array([ np.sqrt((2./np.pi)*omegas[i]*self.J_omega(omegas[i])/rho_slow[i]) for i in range(nmodes) ])
         return omegas, c_ns
 
-# TODO
-class SuperOhmic(Bath):
+class MeierTannor(Bath):
     """
-    Class for Ohmic bath with exponential cuttoff
+    Class for Meier-Tannor spectral density that approximates an arbitrary
+    spectral density.
 
     Notes
     -----
-    TODO
-    J(\omega) = \eta \omega e^{- \omega / \omega_c} / (\omega_c )
+    J(\omega) = \pi/2 \sum_k p_k w / ( ((w + wk)^2 + gamk^2) * ((w-wk)^2 + gamk^2) )
     """
-    def __init__(self, eta, wc, kT, op=None):
-        self.eta = eta
-        self.wc = wc
-        self.omega_inf = 20.*wc
+    def __init__(self, pk, omk, gamk, kT, op=None):
+        self.type = "meier-tannor"
+        self.pk = pk
+        self.omk = omk
+        self.gamk = gamk
+        self.omega_inf = np.amax(omk) + 20.*np.amax(gamk)
         self.kT = kT
-        self.op = op
+        self.c_op = op
+        self.J_omega = self.spectral_density_func
+        self.J0 = self.spectral_density_limit_at_zero
 
     def spectral_density_func(self, w):
-        return self.eta*w*np.exp(-w/self.wc)/self.wc/6.
+        return mt_decomp(w,self.pk,self.omk,self.gamk)
+
+    def zero_T_bcf_t(self, t):
+        raise NotImplementedError
+        # TODO
+        #return mt_decomp_zero_T_bcf_t(t,self.pk,self.omk,self.gamk)
+
+    def im_bath_corr_bose(self, t):
+        # NOTE: need to test my analytical to this numerical
+        #im_Ct = quad(self.J_omega, 0.0, self.omega_inf, limit=1000, weight='sin', wvar=t)
+        #return im_Ct[0]
+        # analytical integration
+        return mt_decomp_im_bath_corr_bose(t,self.pk,self.omk,self.gamk,const.hbar)
 
     @property
     def spectral_density_limit_at_zero(self):
-        raise NotImplementedError
+        return np.sum((self.pk/(self.omk**2.+self.gamk**2.)**2.)[:])
 
-    @property
-    def renormalization_integral(self):
-        raise NotImplementedError
-
+# TODO
+#class SuperOhmic(Bath):
+#    """
+#    Class for Ohmic bath with exponential cuttoff
+#
+#    Notes
+#    -----
+#    TODO
+#    J(\omega) = \eta \omega e^{- \omega / \omega_c} / (\omega_c )
+#    """
+#    def __init__(self, eta, wc, kT, op=None):
+#        self.type = "super ohmic exponential"
+#        self.eta = eta
+#        self.wc = wc
+#        self.omega_inf = 20.*wc
+#        self.kT = kT
+#        self.op = op
+#
+#    def spectral_density_func(self, w):
+#        return self.eta*w*np.exp(-w/self.wc)/self.wc/6.
+#
+#    @property
+#    def spectral_density_limit_at_zero(self):
+#        raise NotImplementedError
+#
+#    @property
+#    def renormalization_integral(self):
+#        raise NotImplementedError
