@@ -87,7 +87,7 @@ class Results(object):
         self.print_states = print_states
         self.states_file = None
         if self.print_states:
-            self.states_file = open(states_file, 'w', buffering=1)
+            self.states_file = states_file
         # jump statistics containers #
         self.jumps = None
         self.jump_times = None
@@ -97,8 +97,6 @@ class Results(object):
     def close_down(self):
         if self.fes != None and self.fes.closed == False:
             self.fes.close()
-        if self.states_file != None and self.states_file.closed == False:
-            self.states_file.close()
 
     def compute_expectation(self, ind, state):
         """
@@ -129,18 +127,7 @@ class Results(object):
         self.maps.append( self.map_function(state) )
 
     def print_state(self, ind, time, state):
-        n = state.shape[0]
-        if is_vector(state):
-            self.states_file.write('%.8f '%(time))
-            for i in range(n):
-                self.states_file.write('%s '%(state[i,0]))
-            self.states_file.write('\n')
-        elif is_matrix(state):
-            self.states_file.write('%.8f\n'%(time))
-            for i in range(n):
-                for j in range(n):
-                    self.states_file.write('%s '%(state[i,j]))
-                self.states_file.write('\n')
+        np.save(self.states_file+str(ind), state)
 
     def analyze_state(self, ind, time, state):
         """
@@ -149,7 +136,7 @@ class Results(object):
         if self.store_states:
             self.states.append( state.copy() )
         if self.print_states:
-            self.print_state(ind, time,state)
+            self.print_state(ind, time, state)
         if self.e_ops != None:
             if self.print_es: self.fes.write('%.8f '%(time))
             self.compute_expectation(ind, state)
