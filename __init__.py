@@ -1,4 +1,4 @@
-from qdynos import constants,hamiltonian,dynamics,unitary,redfield,results,options
+from qdynos import constants,hamiltonian,dynamics,unitary,redfield,results,options,bath
 from qdynos.constants import *
 from qdynos.hamiltonian import *
 from qdynos.dynamics import *
@@ -7,3 +7,4 @@ from qdynos.redfield import *
 from qdynos.results import *
 from qdynos.options import *
 from qdynos.log import *
+from qdynos.bath import *
