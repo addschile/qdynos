@@ -44,7 +44,7 @@ class Results(object):
     """
 
     def __init__(self, tobs=None, e_ops=None, print_es=False, es_file=None, map_ops=False, store_states=False, 
-        print_states=False, states_file=None, jump_stats=False, every=1):
+        print_states=False, states_file=None, states_every=1, jump_stats=False, every=1):
         """
         Initialize results class.
 
@@ -88,6 +88,7 @@ class Results(object):
         self.states_file = None
         if self.print_states:
             self.states_file = states_file
+        self.states_every = states_every
         # jump statistics containers #
         self.jumps = None
         self.jump_times = None
@@ -136,7 +137,8 @@ class Results(object):
         if self.store_states:
             self.states.append( state.copy() )
         if self.print_states:
-            self.print_state(ind, time, state)
+            if ind%self.states_every==0:
+                self.print_state(ind, time, state)
         if self.e_ops != None:
             if self.print_es: self.fes.write('%.8f '%(time))
             self.compute_expectation(ind, state)
