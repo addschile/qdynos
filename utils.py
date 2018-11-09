@@ -48,3 +48,8 @@ def to_liouville(rho):
                         J += 1
                 I += 1
         return rho_mat
+
+def from_liouville(rho_vec, ns=None):
+    if ns is None:
+        ns = int(np.sqrt(len(rho_vec)))
+    return rho_vec.reshape(ns,ns).astype(np.complex_)
