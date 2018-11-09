@@ -2,6 +2,7 @@ import numpy as np
 import qdynos.constants as const
 
 from scipy.integrate import quad
+from scipy.special import jn
 
 from numba import jit,double,complex128
 
@@ -43,6 +44,22 @@ def mt_decomp(w,pk,omk,gamk):
 @jit(double(double,double[:],double[:],double[:],double),nopython=True)
 def mt_decomp_im_bath_corr_bose(t,pk,omk,gamk,hbar):
     return (np.pi**2./8.)*np.sum((np.exp(-gamk*t)*pk*np.sin(omk*t)/(gamk*omk))[:])
+
+@jit(double(double, double),nopython=True)
+def rubin(w, wr):
+    return 0.5*w*wr*np.sqrt(1.-(w/wr)**2.)
+
+#TODO
+#@jit(complex128(double, double),nopython=True)
+#def rubin_zero_T_bcf_t(t, wr):
+#    re_bcf_t = eta*wc**2.*(1.-wc**2.*t**2.)/(1.+wc**2.*t**2.)**2.
+#    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
+#    return re_bcf_t - 1.j*im_bcf_t
+
+@jit(double(double, double, double),nopython=True)
+def rubin_im_bath_corr_bose(t, wr, hbar):
+    im_bcf_t = 0.25*np.pi*wr**2.*jn(2,wr*t)/t
+    return hbar*im_bcf_t
 
 def switch(w, wstar):
     """A smooth switching function for spectral density decompositions.
@@ -306,6 +323,36 @@ class MeierTannor(Bath):
     @property
     def spectral_density_limit_at_zero(self):
         return np.sum((self.pk/(self.omk**2.+self.gamk**2.)**2.)[:])
+
+class RubinBath(Bath):
+    """
+    Class for Rubin (quasi-Ohmic) bath
+
+    Notes
+    -----
+    J(\omega) = 0.5 \omega \omega_R \sqrt{ 1- (\omega/\omega_R)^2}
+    """
+    def __init__(self, wr, kT, op=None):
+        self.type = "rubin"
+        self.wr = wr
+        self.omega_inf = wr
+        self.kT = kT
+        self.c_op = op
+        self.J_omega = self.spectral_density_func
+        self.J0 = self.spectral_density_limit_at_zero
+
+    def spectral_density_func(self, w):
+        return rubin(w,self.wr)
+
+    def zero_T_bcf_t(self, t):
+        raise NotImplementedError
+
+    def im_bath_corr_bose(self, t):
+        return rubin_im_bath_corr_bose(t,self.wr,const.hbar)
+
+    @property
+    def spectral_density_limit_at_zero(self):
+        return self.wr
 
 # TODO
 #class SuperOhmic(Bath):
