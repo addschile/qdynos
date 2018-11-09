@@ -109,6 +109,14 @@ class Redfield(Dynamics):
             self.R = (gamma_plus.transpose(2,1,3,0) + gamma_minus.transpose(2,1,3,0) -\
                      np.einsum('lj,irrk->ijkl', np.identity(nstates), gamma_plus) -\
                      np.einsum('ik,lrrj->ijkl', np.identity(nstates), gamma_minus))
+            if self.is_secular:
+                for i in range(nstates):
+                    for j in range(nstates):
+                        for k in range(nstates):
+                            for l in range(nstates):
+                                if abs(self.ham.omegas[i,j]
+                                       -self.ham.omegas[k,l]) > 1e-6:
+                                    self.R[i,j,k,l] = 0.0
             self.Omega = -1.j*np.einsum('ij,ik,jl->ijkl', self.ham.omegas,
                                    np.identity(nstates), np.identity(nstates))
             self.prop = to_liouville(self.Omega) + to_liouville(self.R)/const.hbar**2.
