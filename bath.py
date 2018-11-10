@@ -56,7 +56,7 @@ def rubin(w, wr):
 #    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
 #    return re_bcf_t - 1.j*im_bcf_t
 
-@jit(double(double, double, double),nopython=True)
+#@jit(double(double, double, double),nopython=True)
 def rubin_im_bath_corr_bose(t, wr, hbar):
     im_bcf_t = 0.25*np.pi*wr**2.*jn(2,wr*t)/t
     return hbar*im_bcf_t
