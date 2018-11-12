@@ -45,9 +45,9 @@ def mt_decomp(w,pk,omk,gamk):
 def mt_decomp_im_bath_corr_bose(t,pk,omk,gamk,hbar):
     return (np.pi**2./8.)*np.sum((np.exp(-gamk*t)*pk*np.sin(omk*t)/(gamk*omk))[:])
 
-@jit(double(double, double),nopython=True)
-def rubin(w, wr):
-    return 0.5*w*wr*np.sqrt(1.-(w/wr)**2.)
+@jit(double(double, double, double),nopython=True)
+def rubin(w, eta, wr):
+    return eta*w*wr*np.sqrt(1.-(w/wr)**2.)
 
 #TODO
 #@jit(complex128(double, double),nopython=True)
@@ -57,9 +57,13 @@ def rubin(w, wr):
 #    return re_bcf_t - 1.j*im_bcf_t
 
 #@jit(double(double, double, double),nopython=True)
-def rubin_im_bath_corr_bose(t, wr, hbar):
-    im_bcf_t = 0.25*np.pi*wr**2.*jn(2,wr*t)/t
-    return hbar*im_bcf_t
+def rubin_im_bath_corr_bose(t, eta, wr, hbar):
+    if t==0:
+        return 0.0
+    else:
+        im_bcf_t = 0.5*eta*np.pi*wr**2.*jn(2,wr*t)/t
+        #im_bcf_t = 0.25*np.pi*wr**2.*jn(2,wr*t)/t
+        return hbar*im_bcf_t
 
 def switch(w, wstar):
     """A smooth switching function for spectral density decompositions.
@@ -332,8 +336,9 @@ class RubinBath(Bath):
     -----
     J(\omega) = 0.5 \omega \omega_R \sqrt{ 1- (\omega/\omega_R)^2}
     """
-    def __init__(self, wr, kT, op=None):
+    def __init__(self, eta, wr, kT, op=None):
         self.type = "rubin"
+        self.eta = eta
         self.wr = wr
         self.omega_inf = wr
         self.kT = kT
@@ -342,13 +347,13 @@ class RubinBath(Bath):
         self.J0 = self.spectral_density_limit_at_zero
 
     def spectral_density_func(self, w):
-        return rubin(w,self.wr)
+        return rubin(w,self.eta,self.wr)
 
     def zero_T_bcf_t(self, t):
         raise NotImplementedError
 
     def im_bath_corr_bose(self, t):
-        return rubin_im_bath_corr_bose(t,self.wr,const.hbar)
+        return rubin_im_bath_corr_bose(t,self.eta,self.wr,const.hbar)
 
     @property
     def spectral_density_limit_at_zero(self):
