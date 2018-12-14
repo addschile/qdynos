@@ -13,58 +13,6 @@ def bose(w, kT, hbar):
     """
     return 1./np.expm1(w*hbar/kT)
 
-@jit(double(double, double, double),nopython=True)
-def ohmic_exp(w, eta, wc):
-    return eta*w*np.exp(-w/wc)
-
-@jit(complex128(double, double, double),nopython=True)
-def ohmic_exp_zero_T_bcf_t(t, eta, wc):
-    re_bcf_t = eta*wc**2.*(1.-wc**2.*t**2.)/(1.+wc**2.*t**2.)**2.
-    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
-    return re_bcf_t - 1.j*im_bcf_t
-
-@jit(double(double, double, double, double),nopython=True)
-def ohmic_exp_im_bath_corr_bose(t, eta, wc, hbar):
-    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
-    return hbar*im_bcf_t
-
-@jit(double(double, double, double),nopython=True)
-def debye(w, eta, wc):
-    return eta*w/(w**2. + wc**2.)
-
-@jit(double(double, double, double, double),nopython=True)
-def debye_im_bath_corr_bose(t, eta, wc, hbar):
-    im_bcf_t = 0.5*np.pi*eta*np.exp(-wc*t)
-    return hbar*im_bcf_t
-
-@jit(double(double,double[:],double[:],double[:]),nopython=True)
-def mt_decomp(w,pk,omk,gamk):
-    return 0.5*np.pi*np.sum((pk*w/( ((w+omk)**2. + gamk**2.)*((w-omk)**2. + gamk**2.) ))[:])
-
-@jit(double(double,double[:],double[:],double[:],double),nopython=True)
-def mt_decomp_im_bath_corr_bose(t,pk,omk,gamk,hbar):
-    return (np.pi**2./8.)*np.sum((np.exp(-gamk*t)*pk*np.sin(omk*t)/(gamk*omk))[:])
-
-@jit(double(double, double, double),nopython=True)
-def rubin(w, eta, wr):
-    return eta*w*wr*np.sqrt(1.-(w/wr)**2.)
-
-#TODO
-#@jit(complex128(double, double),nopython=True)
-#def rubin_zero_T_bcf_t(t, wr):
-#    re_bcf_t = eta*wc**2.*(1.-wc**2.*t**2.)/(1.+wc**2.*t**2.)**2.
-#    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
-#    return re_bcf_t - 1.j*im_bcf_t
-
-#@jit(double(double, double, double),nopython=True)
-def rubin_im_bath_corr_bose(t, eta, wr, hbar):
-    if t==0:
-        return 0.0
-    else:
-        im_bcf_t = 0.5*eta*np.pi*wr**2.*jn(2,wr*t)/t
-        #im_bcf_t = 0.25*np.pi*wr**2.*jn(2,wr*t)/t
-        return hbar*im_bcf_t
-
 def switch(w, wstar):
     """A smooth switching function for spectral density decompositions.
     """
@@ -164,25 +112,17 @@ class Bath(object):
         else:
             #NOTE: don't integrate to infinity for numerical stability
             re_Ct = quad(bath_corr_bose, 0.0, self.omega_inf, limit=1000, weight='cos', wvar=t)
+            #re_Ct = quad(bath_corr_bose, 0.0, self.omega_inf, limit=50000, weight='cos', wvar=t)
             im_Ct = self.im_bath_corr_bose(t)
             re_Ct = re_Ct[0]
             return (1.0/np.pi)*(re_Ct - 1.j*im_Ct)
-            #NOTE: this is what pyrho has
-            #re_Ct = quad(self.real_bath_corr, 
-            #                        -self.omega_inf, self.omega_inf,
-            #                        limit=1000, weight='cos', wvar=t)
-            #im_Ct = quad(self.real_bath_corr, 
-            #                        -self.omega_inf, self.omega_inf,
-            #                        limit=1000, weight='sin', wvar=t)
-            #re_Ct, im_Ct = re_Ct[0], -im_Ct[0]
-            #return (1.0/np.pi)*(re_Ct + 1.j*im_Ct)
 
     def compute_omegas(self, nmodes):
         """
         """
         raise NotImplementedError
 
-    def frozen_mode_decomp(self, omega_star, PD=True):
+    def frozen_mode_decomp(self, omega_star, PD=False):
         """
         Compute the frozen modes for sampling
 
@@ -197,15 +137,35 @@ class Bath(object):
         JCP 143, 194108 (2015).
         JCP 136, 034113 (2012).
         """
-        self.Jslow = lambda w: switch(w,omega_star)*self.J_omega(w)
-        self.Jfast = lambda w: (1.-switch(w,omega_star))*self.J_omega(w) +\
-                        float(PD)*float(abs(w) < 1.e-4)*self.J_omega(w)
+        self.Jslow = lambda w: switch(w,omega_star)*self.spectral_density_func(w)
+        if PD:
+            self.Jfast = lambda w: (1.-switch(w,omega_star))*self.spectral_density_func(w) +\
+                            float(PD)*float(abs(w) < 1.e-4)*self.spectral_density_func(w)
+        else:
+            self.Jfast = lambda w: (1.-switch(w,omega_star))*self.spectral_density_func(w)
+        self.J_omega = self.Jfast
+        self.J0 = 0.0
 
     def sample_modes(self, nmodes, sample):
         omegas, c_ns = self.compute_omegas(nmodes)
         Qs, Ps = sample_modes(omegas, self.kT, sample)
         return omegas , c_ns , Ps , Qs
 
+
+@jit(double(double, double, double),nopython=True)
+def ohmic_exp(w, eta, wc):
+    return eta*w*np.exp(-w/wc)
+
+@jit(complex128(double, double, double),nopython=True)
+def ohmic_exp_zero_T_bcf_t(t, eta, wc):
+    re_bcf_t = eta*wc**2.*(1.-wc**2.*t**2.)/(1.+wc**2.*t**2.)**2.
+    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
+    return re_bcf_t - 1.j*im_bcf_t
+
+@jit(double(double, double, double, double),nopython=True)
+def ohmic_exp_im_bath_corr_bose(t, eta, wc, hbar):
+    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
+    return hbar*im_bcf_t
 
 class OhmicExp(Bath):
     """
@@ -245,8 +205,17 @@ class OhmicExp(Bath):
     def compute_omegas(self, nmodes):
         omegas = np.array([self.wc*(-np.log((nmodes-i-0.5)/nmodes)) for i in range(nmodes)])
         rho_slow = (nmodes/self.wc)*np.exp(-omegas/self.wc)/self.wc
-        c_ns = np.array([np.sqrt((2./np.pi)*omegas[i]*self.J_omega(omegas[i]))/rho_slow[i] for i in range(nmodes)])
+        c_ns = np.array([np.sqrt((2./np.pi)*omegas[i]*self.Jslow(omegas[i]))/rho_slow[i] for i in range(nmodes)])
         return omegas, c_ns
+
+@jit(double(double, double, double),nopython=True)
+def debye(w, eta, wc):
+    return eta*w/(w**2. + wc**2.)
+
+@jit(double(double, double, double, double),nopython=True)
+def debye_im_bath_corr_bose(t, eta, wc, hbar):
+    im_bcf_t = 0.5*np.pi*eta*np.exp(-wc*t)
+    return hbar*im_bcf_t
 
 class DebyeBath(Bath):
     """
@@ -260,7 +229,7 @@ class DebyeBath(Bath):
         self.type = "debye"
         self.eta = eta
         self.wc = wc
-        self.omega_inf = 20.*wc
+        self.omega_inf = 50.*wc
         self.kT = kT
         self.c_op = op
         self.J_omega = self.spectral_density_func
@@ -286,8 +255,16 @@ class DebyeBath(Bath):
     def compute_omegas(self, nmodes):
         omegas = np.array([self.wc*np.tan(0.5*np.pi*(float(i)+0.5)/nmodes) for i in range(nmodes)])
         rho_slow = 2.*(nmodes/np.pi)/(1.+(omegas/self.wc)**2.)/self.wc
-        c_ns = np.array([ np.sqrt((2./np.pi)*omegas[i]*self.J_omega(omegas[i])/rho_slow[i]) for i in range(nmodes) ])
+        c_ns = np.array([ np.sqrt((2./np.pi)*omegas[i]*self.Jslow(omegas[i])/rho_slow[i]) for i in range(nmodes) ])
         return omegas, c_ns
+
+@jit(double(double,double[:],double[:],double[:]),nopython=True)
+def mt_decomp(w,pk,omk,gamk):
+    return 0.5*np.pi*np.sum((pk*w/( ((w+omk)**2. + gamk**2.)*((w-omk)**2. + gamk**2.) ))[:])
+
+@jit(double(double,double[:],double[:],double[:],double),nopython=True)
+def mt_decomp_im_bath_corr_bose(t,pk,omk,gamk,hbar):
+    return (np.pi**2./8.)*np.sum((np.exp(-gamk*t)*pk*np.sin(omk*t)/(gamk*omk))[:])
 
 class MeierTannor(Bath):
     """
@@ -327,6 +304,25 @@ class MeierTannor(Bath):
     @property
     def spectral_density_limit_at_zero(self):
         return np.sum((self.pk/(self.omk**2.+self.gamk**2.)**2.)[:])
+
+@jit(double(double, double, double),nopython=True)
+def rubin(w, eta, wr):
+    return eta*w*wr*np.sqrt(1.-(w/wr)**2.)
+
+#TODO
+#@jit(complex128(double, double),nopython=True)
+#def rubin_zero_T_bcf_t(t, wr):
+#    re_bcf_t = eta*wc**2.*(1.-wc**2.*t**2.)/(1.+wc**2.*t**2.)**2.
+#    im_bcf_t = 2.*eta*wc**3.*t/(1.+wc**2.*t**2.)**2.
+#    return re_bcf_t - 1.j*im_bcf_t
+
+#@jit(double(double, double, double),nopython=True)
+def rubin_im_bath_corr_bose(t, eta, wr, hbar):
+    if t==0:
+        return 0.0
+    else:
+        im_bcf_t = 0.25*np.pi*wr**2.*jn(2,wr*t)/t
+        return hbar*im_bcf_t
 
 class RubinBath(Bath):
     """
