@@ -1,5 +1,9 @@
 import sys
 
+def print_basic(line):
+    sys.stdout.write(line)
+    sys.stdout.flush()
+
 def print_method(line):
     nchar = len(line)
     sys.stdout.write("#"*40+"\n")
