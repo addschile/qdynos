@@ -1,7 +1,7 @@
 import sys
 
 def print_basic(line):
-    sys.stdout.write(line)
+    sys.stdout.write(str(line)+"\n")
     sys.stdout.flush()
 
 def print_method(line):
