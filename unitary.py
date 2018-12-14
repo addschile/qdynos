@@ -71,9 +71,10 @@ class UnitaryDM(Dynamics):
                 self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
             rho = self.ham.to_eigenbasis(rho)
             self.prop = np.exp(-1.j*self.ham.omegas*self.dt)
-            self.equation_of_motion = lambda x: self.prop*x
+            self.equation_of_motion = lambda x,y: self.prop*x
             ode = Integrator(self.dt, self.eom, self.options)
             ode._set_y_value(rho, times[0])
+            btime = time()
             print_stage("Propagating Equation of Motion")
             for i,tau in enumerate(times):
                 if self.options.progress:
