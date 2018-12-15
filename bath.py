@@ -143,8 +143,8 @@ class Bath(object):
                             float(PD)*float(abs(w) < 1.e-4)*self.spectral_density_func(w)
         else:
             self.Jfast = lambda w: (1.-switch(w,omega_star))*self.spectral_density_func(w)
+            self.J0 = 0.0
         self.J_omega = self.Jfast
-        self.J0 = 0.0
 
     def sample_modes(self, nmodes, sample):
         omegas, c_ns = self.compute_omegas(nmodes)
