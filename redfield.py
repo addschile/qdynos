@@ -73,18 +73,25 @@ class Redfield(Dynamics):
                 elif self.options.space == 'liouville':
                     self.equation_of_motion = self.super_td_rf_eom
             else:
-                if self.options.space == 'hilbert':
-                    self.equation_of_motion = self.rf_eom
-                elif self.options.space == 'liouville':
+                if self.is_secular:
                     self.equation_of_motion = self.super_rf_eom
+                else:
+                    if self.options.space == 'hilbert':
+                        self.equation_of_motion = self.rf_eom
+                    elif self.options.space == 'liouville':
+                        self.equation_of_motion = self.super_rf_eom
 
     def make_redfield_operators(self):
         """Make and store the coupling operators and "dressed" copuling operators.
         """
         nstates = self.ham.nstates
         if self.options.space == "hilbert":
-            self.C = list()
-            self.E = list()
+            if self.is_secular:
+                self.prop = np.zeros((nstates,nstates))
+                self.Rdep = np.zeros((nstates,nstates),dtype=complex)
+            else:
+                self.C = list()
+                self.E = list()
         elif self.options.space == "liouville":
             gamma_plus  = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
             gamma_minus = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
@@ -99,9 +106,25 @@ class Redfield(Dynamics):
                     if i!=j:
                         theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
             if self.options.space == "hilbert":
-                Ga_plus = Ga*theta_plus
-                self.C.append(Ga.copy())
-                self.E.append(Ga_plus.copy())
+                if self.is_secular:
+                    # population transfer matrix
+                    self.prop += 2.*np.einsum('ji,ij,ij->ij',Ga,Ga,theta_plus.real)/const.hbar**2.
+                    for i in range(nstates):
+                        self.prop[i,i] = 0.0
+                        self.prop[i,i] -= np.sum(self.prop[:,i])
+                    # dephasing matrix
+                    self.Rdep += np.einsum('jj,ii,ii->ij',Ga,Ga,theta_plus)
+                    self.Rdep += np.einsum('jj,ii,jj->ij',Ga,Ga,theta_plus.conj().T)
+                    same_ik = np.einsum('im,mi,mi->i',Ga,Ga,theta_plus)
+                    same_lj = np.einsum('im,mi,im->i',Ga,Ga,theta_plus.conj().T)
+                    for i in range(nstates):
+                        self.Rdep[i,:] -= same_ik[i]
+                        self.Rdep[:,i] -= same_lj[i]
+                    self.Rdep -= self.Rdep*np.eye(nstates)
+                else:
+                    Ga_plus = Ga*theta_plus
+                    self.C.append(Ga.copy())
+                    self.E.append(Ga_plus.copy())
             elif self.options.space == "liouville":
                 gamma_plus  += np.einsum('lj,ik,ik->ljik', Ga, Ga, theta_plus)
                 gamma_minus += np.einsum('lj,ik,lj->ljik', Ga, Ga, theta_plus.conj().T)
@@ -223,6 +246,9 @@ class Redfield(Dynamics):
 
         if self.options.space == "liouville" or self.options.method == "exact":
             rho = to_liouville(rho)
+        elif self.options.space == "hilbert" and self.is_secular:
+            rho_od = rho*(np.ones((self.ham.nstates,self.ham.nstates)) - np.eye(self.ham.nstates))
+            rho = np.diag(rho.copy())
         self.ode._set_y_value(rho, times[0])
         btime = time()
         for i,tau in enumerate(times):
@@ -235,7 +261,11 @@ class Redfield(Dynamics):
                 self.update_ops(tau)
             if i%self.results.every==0:
                 if self.options.space == "hilbert":
-                    self.results.analyze_state(i, tau, self.ode.y)
+                    if self.is_secular:
+                        self.results.analyze_state(i, tau, np.diag(self.ode.y)+rho_od)
+                        rho_od *= self.Rdep
+                    else:
+                        self.results.analyze_state(i, tau, self.ode.y)
                 elif self.options.space == "liouville" or self.options.method == "exact":
                     self.results.analyze_state(i, tau, from_liouville(self.ode.y))
             self.ode.integrate()
@@ -267,6 +297,8 @@ class Redfield(Dynamics):
             self.make_redfield_operators()
             if self.options.method == "exact":
                 self.prop = expm(self.dt*self.prop)
+            if self.options.space == "hilbert" and self.is_secular:
+                self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + self.Rdep/const.hbar**2.))
         if self.options.verbose:
             etime = time()
             print_stage("Finished Constructing Operators")
