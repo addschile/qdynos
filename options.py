@@ -20,10 +20,11 @@ class Options(object):
         self.method = method
 
         # liouville or hilbert space #
-        if self.method != "exact":
-            self.space = space
-        else:
-            self.space = "liouville"
+        self.space = space
+        #if self.method != "exact":
+        #    self.space = space
+        #else:
+        #    self.space = "liouville"
 
         # TCL2 options #
         self.markov_time = markov_time
