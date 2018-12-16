@@ -244,7 +244,7 @@ class Redfield(Dynamics):
             for i in range(len(self.results.e_ops)):
                 self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
 
-        if self.options.space == "liouville" or self.options.method == "exact":
+        if self.options.space == "liouville":
             rho = to_liouville(rho)
         elif self.options.space == "hilbert" and self.is_secular:
             rho_od = rho*(np.ones((self.ham.nstates,self.ham.nstates)) - np.eye(self.ham.nstates))
@@ -266,7 +266,7 @@ class Redfield(Dynamics):
                         rho_od *= self.Rdep
                     else:
                         self.results.analyze_state(i, tau, self.ode.y)
-                elif self.options.space == "liouville" or self.options.method == "exact":
+                elif self.options.space == "liouville":
                     self.results.analyze_state(i, tau, from_liouville(self.ode.y))
             self.ode.integrate()
 
