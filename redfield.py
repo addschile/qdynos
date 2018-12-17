@@ -64,6 +64,12 @@ class Redfield(Dynamics):
         if self.options.method == "exact":
             if self.time_dep:
                 raise NotImplementedError
+            elif self.options.space == "hilbert":
+                if self.is_secular:
+                    self.equation_of_motion = self.super_rf_eom
+                else:
+                    raise NotImplementedError
+                
             else:
                 self.equation_of_motion = self.super_rf_eom
         else:
