@@ -2,11 +2,12 @@ import numpy as np
 import qdynos.constants as const
 
 from copy import deepcopy
+from time import time
 from .hamiltonian import Hamiltonian,MDHamiltonian
 from .results import add_results,avg_results
 from .dynamics import Dynamics
 from .unitary import UnitaryDM
-from .log import print_basic
+from .log import print_basic,print_progress
 
 class Frozen:
 
@@ -45,8 +46,12 @@ class Frozen:
     def solve(self, rho0, times, nmodes=300, ntraj=1000, sample="Boltzmann", results=None):
         results_out = deepcopy(results)
 
+        every = int(ntraj/10)
+        btime = time()
         for traj in range(ntraj):
-            print_basic(traj)
+            if traj%every==0:
+                print_progress(10*traj/every,time()-btime)
+            #print_basic(traj)
             dynamics_copy = deepcopy(self.dynamics)
             baths_copy = [deepcopy(self.baths[i]) for i in range(self.nbath)]
             
