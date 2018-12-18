@@ -36,7 +36,7 @@ class Frozen:
                 if self.nstates != 2:
                     raise ValueError("Automated omega star only for two-level system.")
                 else:
-                    omega_stars = [2.*np.sqrt( 0.25*(H[0,0]-H[1,1])**2. + H[0,1]**2. )/const.hbar]*self.nbath
+                    omega_stars = [0.5*np.sqrt( 0.25*(H[0,0]-H[1,1])**2. + H[0,1]**2. )/const.hbar]*self.nbath
             if PDs==None:
                 PDs = [False]*self.nbath
             # compute decomposed spectral densities for each bath #
