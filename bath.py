@@ -112,7 +112,6 @@ class Bath(object):
         else:
             #NOTE: don't integrate to infinity for numerical stability
             re_Ct = quad(bath_corr_bose, 0.0, self.omega_inf, limit=1000, weight='cos', wvar=t)
-            #re_Ct = quad(bath_corr_bose, 0.0, self.omega_inf, limit=50000, weight='cos', wvar=t)
             im_Ct = self.im_bath_corr_bose(t)
             re_Ct = re_Ct[0]
             return (1.0/np.pi)*(re_Ct - 1.j*im_Ct)
@@ -140,7 +139,7 @@ class Bath(object):
         self.Jslow = lambda w: switch(w,omega_star)*self.spectral_density_func(w)
         if PD:
             self.Jfast = lambda w: (1.-switch(w,omega_star))*self.spectral_density_func(w) +\
-                            float(PD)*float(abs(w) < 1.e-4)*self.spectral_density_func(w)
+                            float(PD)*float(abs(w) < 1.e-8)*self.spectral_density_func(w)
         else:
             self.Jfast = lambda w: (1.-switch(w,omega_star))*self.spectral_density_func(w)
             self.J0 = 0.0
