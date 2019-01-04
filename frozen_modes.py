@@ -46,7 +46,9 @@ class Frozen:
     def solve(self, rho0, times, nmodes=300, ntraj=1000, sample="Boltzmann", results=None):
         results_out = deepcopy(results)
 
-        every = int(ntraj/10)
+        every = None
+        if ntraj >= 10: every = int(ntraj/10)
+        else: every = 1
         btime = time()
         for traj in range(ntraj):
             if traj%every==0:
@@ -61,7 +63,7 @@ class Frozen:
                 Hb += np.sum((c_ns*Qs)[:])*self.baths[i].c_op
 
             if self.hamtype=="default":
-                dynamics_copy.ham = Hamiltonian(Hb, baths=baths_copy, hbar=self.hbar)
+                dynamics_copy.ham = Hamiltonian(Hb, nstates=self.nstates, baths=baths_copy, hbar=self.hbar)
             elif self.hamtype=="md":
                 dynamics_copy.ham = MDHamiltonian(Hb, baths=baths_copy, hbar=self.hbar)
 
