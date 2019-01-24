@@ -32,7 +32,6 @@ class Frozen:
         else:
             self.dynamics = dynamics
             if not (isinstance(omega_stars, list) or isinstance(omega_stars, np.ndarray)):
-            #if omega_stars==None:
                 if self.nstates != 2:
                     raise ValueError("Automated omega star only for two-level system.")
                 else:
@@ -53,7 +52,6 @@ class Frozen:
         for traj in range(ntraj):
             if traj%every==0:
                 print_progress(10*traj/every,time()-btime)
-            #print_basic(traj)
             dynamics_copy = deepcopy(self.dynamics)
             baths_copy = [deepcopy(self.baths[i]) for i in range(self.nbath)]
             
