@@ -47,7 +47,8 @@ class Redfield(Dynamics):
             self.options = options
             if self.options.method == "exact":
                 if self.time_dep:
-                    raise NotImplementedError
+                    if not self.is_secular and not self.options.space == "hilbert":
+                        raise NotImplementedError
 
     def setup(self, times, results):
         self.dt = times[1]-times[0]
@@ -63,19 +64,24 @@ class Redfield(Dynamics):
         self.ode = Integrator(self.dt, self.eom, self.options)
         if self.options.method == "exact":
             if self.time_dep:
-                raise NotImplementedError
+                if self.is_secular and self.options.space == "hilbert":
+                    self.equation_of_motion = self.super_rf_eom
+                else:
+                    raise NotImplementedError
             elif self.options.space == "hilbert":
                 if self.is_secular:
                     self.equation_of_motion = self.super_rf_eom
                 else:
                     raise NotImplementedError
-                
             else:
                 self.equation_of_motion = self.super_rf_eom
         else:
             if self.time_dep:
                 if self.options.space == 'hilbert':
-                    self.equation_of_motion = self.td_rf_eom
+                    if self.is_secular:
+                        self.equation_of_motion = self.super_td_rf_eom
+                    else:
+                        self.equation_of_motion = self.td_rf_eom
                 elif self.options.space == 'liouville':
                     self.equation_of_motion = self.super_td_rf_eom
             else:
@@ -115,9 +121,6 @@ class Redfield(Dynamics):
                 if self.is_secular:
                     # population transfer matrix
                     self.prop += 2.*np.einsum('ji,ij,ij->ij',Ga,Ga,theta_plus.real)/const.hbar**2.
-                    for i in range(nstates):
-                        self.prop[i,i] = 0.0
-                        self.prop[i,i] -= np.sum(self.prop[:,i])
                     # dephasing matrix
                     self.Rdep += np.einsum('jj,ii,ii->ij',Ga,Ga,theta_plus)
                     self.Rdep += np.einsum('jj,ii,jj->ij',Ga,Ga,theta_plus.conj().T)
@@ -126,7 +129,6 @@ class Redfield(Dynamics):
                     for i in range(nstates):
                         self.Rdep[i,:] -= same_ik[i]
                         self.Rdep[:,i] -= same_lj[i]
-                    self.Rdep -= self.Rdep*np.eye(nstates)
                 else:
                     Ga_plus = Ga*theta_plus
                     self.C.append(Ga.copy())
@@ -134,7 +136,13 @@ class Redfield(Dynamics):
             elif self.options.space == "liouville":
                 gamma_plus  += np.einsum('lj,ik,ik->ljik', Ga, Ga, theta_plus)
                 gamma_minus += np.einsum('lj,ik,lj->ljik', Ga, Ga, theta_plus.conj().T)
-        if self.options.space == "liouville":
+        if self.options.space == "hilbert":
+            if self.is_secular:
+                for i in range(nstates):
+                    self.prop[i,i] = 0.0
+                    self.prop[i,i] -= np.sum(self.prop[:,i])
+                self.Rdep -= self.Rdep*np.eye(nstates)
+        elif self.options.space == "liouville":
             self.R = (gamma_plus.transpose(2,1,3,0) + gamma_minus.transpose(2,1,3,0) -\
                      np.einsum('lj,irrk->ijkl', np.identity(nstates), gamma_plus) -\
                      np.einsum('ik,lrrj->ijkl', np.identity(nstates), gamma_minus))
@@ -165,48 +173,152 @@ class Redfield(Dynamics):
             self.gamma_n[op] = list()
             self.gamma_n_1[op] = list()
 
-        for op,bath in enumerate(self.ham.baths):
-            for k in range(self.ode.order):
-                t = b[k]*self.dt
-                if k==0:
-                    self.gamma_n[op].append( np.zeros((nstates,nstates),dtype=complex) )
-                    theta_plus = np.exp(-1.j*self.ham.omegas*0.0)*bath.bath_corr_t(0.0)
-                    self.gamma_n_1[op].append(theta_plus.copy())
-                else:
-                    theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
-                    self.gamma_n[op].append( self.gamma_n[op][k-1] + 0.5*(b[k]-b[k-1])*self.dt*(theta_plus + self.gamma_n_1[op][k-1]) )
-                    self.gamma_n_1[op].append( theta_plus.copy() )
+        if self.options.method == "exact":
+            for op,bath in enumerate(self.ham.baths):
+                self.gamma_n[op].append( np.zeros((nstates,nstates),dtype=complex) )
+                theta_plus = np.exp(-1.j*self.ham.omegas*0.0)*bath.bath_corr_t(0.0)
+                self.gamma_n_1[op].append(theta_plus.copy())
+                theta_plus = np.exp(-1.j*self.ham.omegas*self.dt)*bath.bath_corr_t(self.dt)
+                self.gamma_n[op].append( self.gamma_n[op][0] + self.dt*(theta_plus + self.gamma_n_1[op][0]) )
+                self.gamma_n_1[op].append( theta_plus.copy() )
+        else:
+            for op,bath in enumerate(self.ham.baths):
+                for k in range(self.ode.order):
+                    t = b[k]*self.dt
+                    if k==0:
+                        self.gamma_n[op].append( np.zeros((nstates,nstates),dtype=complex) )
+                        theta_plus = np.exp(-1.j*self.ham.omegas*0.0)*bath.bath_corr_t(0.0)
+                        self.gamma_n_1[op].append(theta_plus.copy())
+                    else:
+                        theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
+                        self.gamma_n[op].append( self.gamma_n[op][k-1] + 0.5*(b[k]-b[k-1])*self.dt*(theta_plus + self.gamma_n_1[op][k-1]) )
+                        self.gamma_n_1[op].append( theta_plus.copy() )
         if self.options.space == "liouville":
             self.Omega = -1.j*np.einsum('ij,ik,jl->ijkl', self.ham.omegas,
                                    np.identity(nstates), np.identity(nstates))
             self.Omega = to_liouville(self.Omega)
+        if self.is_secular:
+            if self.options.space == "hilbert":
+                self.prop_n_1 = np.zeros((nstates,nstates))
+                self.Rdep_n_1 = np.zeros((nstates,nstates),dtype=complex)
 
     def make_tcl2_operators(self, time):
         """Integrate "dressing" for copuling operators. Uses trapezoid rule 
         with grid of integration method (e.g., Runge-Kutta 4).
         """
-        b = self.ode.b
-        for op,bath in enumerate(self.ham.baths):
-            for k in range(self.ode.order):
-                t = time + b[k]*self.dt
+        if self.options.method == 'exact':
+            for op,bath in enumerate(self.ham.baths):
+                # t
+                t = time
                 theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
-                if k==0:
-                    self.gamma_n[op][k] = self.gamma_n[op][-1].copy()
-                    self.gamma_n_1[op][k] = theta_plus.copy()
-                else:
-                    self.gamma_n[op][k] = self.gamma_n[op][k-1] + 0.5*self.dt*(b[k]-b[k-1])*(theta_plus + self.gamma_n_1[op][k-1])
-                    self.gamma_n_1[op][k] = theta_plus.copy()
+                self.gamma_n[op][0] = self.gamma_n[op][-1].copy()
+                self.gamma_n_1[op][0] = theta_plus.copy()
+                # t + dt
+                t = time + self.dt
+                theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
+                self.gamma_n_1[op][-1] = theta_plus.copy()
+                self.gamma_n[op][-1] = self.gamma_n[op][0] + self.dt*(theta_plus + self.gamma_n_1[op][0])
+        else:
+            b = self.ode.b
+            for op,bath in enumerate(self.ham.baths):
+                for k in range(self.ode.order):
+                    t = time + b[k]*self.dt
+                    theta_plus = np.exp(-1.j*self.ham.omegas*t)*bath.bath_corr_t(t)
+                    if k==0:
+                        self.gamma_n[op][k] = self.gamma_n[op][-1].copy()
+                        self.gamma_n_1[op][k] = theta_plus.copy()
+                    else:
+                        self.gamma_n[op][k] = self.gamma_n[op][k-1] + 0.5*self.dt*(b[k]-b[k-1])*(theta_plus + self.gamma_n_1[op][k-1])
+                        self.gamma_n_1[op][k] = theta_plus.copy()
 
     def update_ops(self, time):
         """Update the dressed coupling operators by integrating Fourier-Laplace
         transform of bath correlation function in time.
         """
+        nstates = self.ham.nstates
         if self.options.space == "hilbert":
-            self.E = [[]]*self.ham.nbaths
-            for i in range(len(self.C)):
-                self.E[i] = list()
-                for j in range(self.ode.order):
-                    self.E[i].append(self.gamma_n[i][j]*self.C[i])
+            if self.is_secular:
+                if self.options.method == "exact":
+                    ### time integrate the operators ###
+                    self.prop_n = np.zeros((nstates,nstates))
+                    self.Rdep_n = np.zeros((nstates,nstates),dtype=complex)
+                    for j in range(len(self.C)):
+                        # population transfer matrix
+                        self.prop_n += 2.*np.einsum('ji,ij,ij->ij',self.C[j],self.C[j],self.gamma_n[j][-1].real)/const.hbar**2.
+                        # dephasing matrix
+                        self.Rdep_n += np.einsum('jj,ii,ii->ij',self.C[j],self.C[j],self.gamma_n[j][-1])
+                        self.Rdep_n += np.einsum('jj,ii,jj->ij',self.C[j],self.C[j],self.gamma_n[j][-1].conj().T)
+                        same_ik = np.einsum('im,mi,mi->i',self.C[j],self.C[j],self.gamma_n[j][-1])
+                        same_lj = np.einsum('im,mi,im->i',self.C[j],self.C[j],self.gamma_n[j][-1].conj().T)
+                        for i in range(nstates):
+                            self.Rdep_n[i,:] -= same_ik[i]
+                            self.Rdep_n[:,i] -= same_lj[i]
+                    for i in range(nstates):
+                        self.prop_n[i,i] = 0.0
+                        self.prop_n[i,i] -= np.sum(self.prop_n[:,i])
+                    self.Rdep_n -= self.Rdep_n*np.eye(nstates)
+                    # make propagators
+                    #self.prop = expm(self.dt*(self.prop_n-self.prop_n_1))
+                    #self.prop_n_1 = self.prop_n.copy()
+                    #self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + (self.Rdep_n-self.Rdep_n_1)/const.hbar**2.))
+                    #self.Rdep_n_1 = self.Rdep_n.copy()
+                    self.prop = expm(self.prop_n-self.prop_n_1)
+                    self.prop_n_1 = self.prop_n.copy()
+                    self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + (self.Rdep_n-self.Rdep_n_1)/const.hbar**2./self.dt))
+                    self.Rdep_n_1 = self.Rdep_n.copy()
+                    #### time integrate the rates ###
+                    #self.prop = np.zeros((nstates,nstates))
+                    #self.Rdep = np.zeros((nstates,nstates),dtype=complex)
+                    #for j in range(len(self.C)):
+                    #    # population transfer matrix
+                    #    gamma_diff = self.gamma_n[j][-1].real-self.gamma_n[j][0].real
+                    #    self.prop += 2.*np.einsum('ji,ij,ij->ij',self.C[j],self.C[j],gamma_diff.real)/const.hbar**2.
+                    #    # dephasing matrix
+                    #    self.Rdep += np.einsum('jj,ii,ii->ij',self.C[j],self.C[j],gamma_diff)
+                    #    self.Rdep += np.einsum('jj,ii,jj->ij',self.C[j],self.C[j],gamma_diff.conj().T)
+                    #    same_ik = np.einsum('im,mi,mi->i',self.C[j],self.C[j],gamma_diff)
+                    #    same_lj = np.einsum('im,mi,im->i',self.C[j],self.C[j],gamma_diff.conj().T)
+                    #    for i in range(nstates):
+                    #        self.Rdep[i,:] -= same_ik[i]
+                    #        self.Rdep[:,i] -= same_lj[i]
+                    #for i in range(nstates):
+                    #    self.prop[i,i] = 0.0
+                    #    self.prop[i,i] -= np.sum(self.prop[:,i])
+                    #self.Rdep -= self.Rdep*np.eye(nstates)
+                    ## make propagators
+                    ##self.prop = expm(self.dt*self.prop)
+                    ##self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + self.Rdep/const.hbar**2.))
+                    #self.prop = expm(self.prop)
+                    #self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + self.Rdep/self.dt/const.hbar**2.))
+                else:
+                    self.prop = list()
+                    self.Rdep = list()
+                    for i in range(self.ode.order):
+                        prop_n = np.zeros((nstates,nstates))
+                        Rdep_n = np.zeros((nstates,nstates),dtype=complex)
+                        for j in range(len(self.C)):
+                            # population transfer matrix
+                            prop_n += 2.*np.einsum('ji,ij,ij->ij',self.C[j],self.C[j],self.gamma_n[j][i].real)/const.hbar**2.
+                            # dephasing matrix
+                            Rdep_n += np.einsum('jj,ii,ii->ij',self.C[j],self.C[j],self.gamma_n[j][i])
+                            Rdep_n += np.einsum('jj,ii,jj->ij',self.C[j],self.C[j],self.gamma_n[j][i].conj().T)
+                            same_ik = np.einsum('im,mi,mi->i',self.C[j],self.C[j],self.gamma_n[j][i])
+                            same_lj = np.einsum('im,mi,im->i',self.C[j],self.C[j],self.gamma_n[j][i].conj().T)
+                            for i in range(nstates):
+                                Rdep_n[i,:] -= same_ik[i]
+                                Rdep_n[:,i] -= same_lj[i]
+                        for i in range(nstates):
+                            prop_n[i,i] = 0.0
+                            prop_n[i,i] -= np.sum(prop_n[:,i])
+                        Rdep_n -= Rdep_n*np.eye(nstates)
+                        self.prop.append( prop_n.copy() )
+                        self.Rdep.append( Rdep_n.copy() )
+            else:
+                self.E = [[]]*self.ham.nbaths
+                for i in range(len(self.C)):
+                    self.E[i] = list()
+                    for j in range(self.ode.order):
+                        self.E[i].append(self.gamma_n[i][j]*self.C[i])
         elif self.options.space == "liouville":
             nstates = self.ham.nstates
             self.prop = list()
@@ -219,6 +331,14 @@ class Redfield(Dynamics):
                 R = (gamma_plus.transpose(2,1,3,0) + gamma_minus.transpose(2,1,3,0) -\
                     np.einsum('lj,irrk->ijkl', np.identity(nstates), gamma_plus) -\
                     np.einsum('ik,lrrj->ijkl', np.identity(nstates), gamma_minus))
+                if self.is_secular:
+                    for j in range(nstates):
+                        for k in range(nstates):
+                            for l in range(nstates):
+                                for m in range(nstates):
+                                    if abs(self.ham.omegas[j,k]
+                                           -self.ham.omegas[l,m]) > 1e-6:
+                                        R[j,k,l,m] = 0.0
                 self.prop.append( self.Omega + to_liouville(R.copy())/const.hbar**2. )
         if time < self.options.markov_time:
             self.make_tcl2_operators(time)
@@ -269,7 +389,13 @@ class Redfield(Dynamics):
                 if self.options.space == "hilbert":
                     if self.is_secular:
                         self.results.analyze_state(i, tau, np.diag(self.ode.y)+rho_od)
-                        rho_od *= self.Rdep
+                        if self.options.method == "exact":
+                            rho_od *= self.Rdep
+                        else:
+                            b = self.ode.b
+                            for j in range(self.ode.order-1):
+                                rho_od *= np.exp((b[j+1]-b[j])*self.dt*self.Rdep[j+1]/const.hbar**2.)
+                            rho_od *= np.exp(-1.j*self.dt*self.ham.omegas)
                     else:
                         self.results.analyze_state(i, tau, self.ode.y)
                 elif self.options.space == "liouville":
@@ -297,8 +423,7 @@ class Redfield(Dynamics):
             print_stage("Initializing Coupling Operators")
             btime = time()
         if self.time_dep:
-            if self.options.method != "exact":
-                self.coupling_operators_setup()
+            self.coupling_operators_setup()
         else:
             self.make_redfield_operators()
             if self.options.method == "exact":
