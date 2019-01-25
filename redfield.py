@@ -389,17 +389,18 @@ class Redfield(Dynamics):
                 if self.options.space == "hilbert":
                     if self.is_secular:
                         self.results.analyze_state(i, tau, np.diag(self.ode.y)+rho_od)
-                        if self.options.method == "exact":
-                            rho_od *= self.Rdep
-                        else:
-                            b = self.ode.b
-                            for j in range(self.ode.order-1):
-                                rho_od *= np.exp((b[j+1]-b[j])*self.dt*self.Rdep[j+1]/const.hbar**2.)
-                            rho_od *= np.exp(-1.j*self.dt*self.ham.omegas)
                     else:
                         self.results.analyze_state(i, tau, self.ode.y)
                 elif self.options.space == "liouville":
                     self.results.analyze_state(i, tau, from_liouville(self.ode.y))
+            if self.is_secular and self.options.space == "hilbert":
+                if self.options.method == "exact":
+                    rho_od *= self.Rdep
+                else:
+                    b = self.ode.b
+                    for j in range(self.ode.order-1):
+                        rho_od *= np.exp((b[j+1]-b[j])*self.dt*self.Rdep[j+1]/const.hbar**2.)
+                    rho_od *= np.exp(-1.j*self.dt*self.ham.omegas)
             self.ode.integrate()
 
         return self.results
