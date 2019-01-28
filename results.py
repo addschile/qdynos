@@ -69,9 +69,9 @@ class Results(object):
         if self.e_ops != None:
             if self.print_es:
                 if es_file==None:
-                    self.fes = open('output.dat','w', buffering=1)
+                    self.fes = open("output.dat","w")
                 else:
-                    self.fes = open(es_file,'w', buffering=1)
+                    self.fes = open(es_file,"w")
             self.expect = np.zeros((len(self.e_ops),tobs))
         # mapping expectation value containers #
         self.map_ops = map_ops
@@ -131,9 +131,12 @@ class Results(object):
             if ind%self.states_every==0:
                 self.print_state(ind, time, state)
         if self.e_ops != None:
-            if self.print_es: self.fes.write('%.8f '%(time))
+            if self.print_es: 
+                self.fes.write('%.8f '%(time))
             self.compute_expectation(ind, state)
-            if self.print_es: self.fes.write('\n')
+            if self.print_es: 
+                self.fes.write('\n')
+                self.fes.flush()
         if self.map_ops:
             self.mapping_expect(state)
         if ind==(self.tobs-1):

@@ -57,7 +57,7 @@ class Frozen:
             
             Hb = self.dynamics.ham.ham.copy()
             if self.options.print_decomp:
-                self.options.decomp_file = open(self.options._decomp_file, "w")
+                self.options.decomp_file = open(self.options._decomp_file+"_traj_%d"%(traj), "w")
             for i in range(self.nbath):
                 omegas, c_ns, Ps, Qs = self.baths[i].sample_modes(nmodes, sample)
                 if self.options.print_decomp:
@@ -74,7 +74,11 @@ class Frozen:
                 dynamics_copy.ham = MDHamiltonian(Hb, baths=baths_copy, hbar=self.hbar)
 
             rho = rho0.copy()
-            results_i = dynamics_copy.solve(rho, times, results=deepcopy(results))
+            traj_results = deepcopy(results)
+            if self.options.traj_results:
+                traj_results.print_es = True
+                traj_results.fes = open(self.options.traj_results_file+"_traj_%d"%(traj), "w")
+            results_i = dynamics_copy.solve(rho, times, results=traj_results)
             results_out = add_results(results_out,results_i)
 
         return avg_results(ntraj, results_out)
