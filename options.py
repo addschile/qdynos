@@ -6,9 +6,10 @@ class Options(object):
     """
 
     def __init__(self, verbose=True, really_verbose=False, progress=True,
-                 method="rk4", space="hilbert", ntraj=1000, block_avg=False, 
-                 nblocks=10, norm_steps=1000, norm_tol=1.e-3, seed=None, 
-                 markov_time=np.inf, restart_file=None, restart=False):
+                 method="rk4", space="hilbert", print_decomp=False, 
+                 decomp_file=None,ntraj=1000, block_avg=False, nblocks=10, 
+                 norm_steps=1000, norm_tol=1.e-3, seed=None, markov_time=np.inf,
+                 restart_file=None, restart=False):
 
         # program run options #
         self.verbose = verbose
@@ -21,23 +22,26 @@ class Options(object):
 
         # liouville or hilbert space #
         self.space = space
-        #if self.method != "exact":
-        #    self.space = space
-        #else:
-        #    self.space = "liouville"
 
         # TCL2 options #
         self.markov_time = markov_time
 
-        # unraveling options #
+        # frozen mode options #
+        self.print_decomp = print_decomp
+        self._decomp_file = decomp_file
+        self.decomp_file = None
+
+        # sampling options #
         self.ntraj = ntraj
         self.block_avg = block_avg
         if block_avg:
             self.nblocks = nblocks
-        self.norm_steps = norm_steps
-        self.norm_tol = norm_tol
         self.seed = seed
 
         # unraveling options #
+        self.norm_steps = norm_steps
+        self.norm_tol = norm_tol
+
+        # NOTE in progress: restart options #
         self.restart_file = restart_file
         self.restart = restart

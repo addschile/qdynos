@@ -56,9 +56,17 @@ class Frozen:
             baths_copy = [deepcopy(self.baths[i]) for i in range(self.nbath)]
             
             Hb = self.dynamics.ham.ham.copy()
+            if self.options.print_decomp:
+                self.options.decomp_file = open(self.options._decomp_file, "w")
             for i in range(self.nbath):
                 omegas, c_ns, Ps, Qs = self.baths[i].sample_modes(nmodes, sample)
+                if self.options.print_decomp:
+                    for j in range(len(c_ns)):
+                        self.options.decomp_file.write("%.8f %.8f %.8f %.8f\n"%(omegas[j],c_ns[j],Ps[j],Qs[j]))
+                        self.options.decomp_file.flush()
                 Hb += np.sum((c_ns*Qs)[:])*self.baths[i].c_op
+            if self.options.print_decomp:
+                self.options.decomp_file.close()
 
             if self.hamtype=="default":
                 dynamics_copy.ham = Hamiltonian(Hb, nstates=self.nstates, baths=baths_copy, hbar=self.hbar)
