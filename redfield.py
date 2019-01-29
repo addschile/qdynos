@@ -304,12 +304,12 @@ class Redfield(Dynamics):
                             Rdep_n += np.einsum('jj,ii,jj->ij',self.C[j],self.C[j],self.gamma_n[j][i].conj().T)
                             same_ik = np.einsum('im,mi,mi->i',self.C[j],self.C[j],self.gamma_n[j][i])
                             same_lj = np.einsum('im,mi,im->i',self.C[j],self.C[j],self.gamma_n[j][i].conj().T)
-                            for i in range(nstates):
-                                Rdep_n[i,:] -= same_ik[i]
-                                Rdep_n[:,i] -= same_lj[i]
-                        for i in range(nstates):
-                            prop_n[i,i] = 0.0
-                            prop_n[i,i] -= np.sum(prop_n[:,i])
+                            for k in range(nstates):
+                                Rdep_n[k,:] -= same_ik[k]
+                                Rdep_n[:,k] -= same_lj[k]
+                        for j in range(nstates):
+                            prop_n[j,j] = 0.0
+                            prop_n[j,j] -= np.sum(prop_n[:,j])
                         Rdep_n -= Rdep_n*np.eye(nstates)
                         self.prop.append( prop_n.copy() )
                         self.Rdep.append( Rdep_n.copy() )
