@@ -78,6 +78,9 @@ class Frozen:
             if self.options.traj_results:
                 traj_results.print_es = True
                 traj_results.fes = open(self.options.traj_results_file+"_traj_%d"%(traj), "w")
+            if self.options.traj_state:
+                traj_results.print_states = True
+                traj_results.states_file = self.opitions.traj_states_file
             results_i = dynamics_copy.solve(rho, times, results=traj_results)
             results_out = add_results(results_out,results_i)
 
