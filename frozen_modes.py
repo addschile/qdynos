@@ -7,6 +7,7 @@ from .hamiltonian import Hamiltonian,MDHamiltonian
 from .results import add_results,avg_results
 from .dynamics import Dynamics
 from .unitary import UnitaryDM
+from .options import Options
 from .log import print_basic,print_progress
 
 class Frozen:
@@ -19,7 +20,10 @@ class Frozen:
         else:
             self.nstates = nstates
         self.baths = baths
-        self.options = options
+        if options==None:
+            self.options = Options()
+        else:
+            self.options = options
         self.hamtype = hamtype
         self.hbar = hbar
 
@@ -62,10 +66,12 @@ class Frozen:
                 omegas, c_ns, Ps, Qs = self.baths[i].sample_modes(nmodes, sample)
                 if self.options.print_decomp:
                     for j in range(len(c_ns)):
-                        self.options.decomp_file.write("%.8f %.8f %.8f %.8f\n"%(omegas[j],c_ns[j],Ps[j],Qs[j]))
+                        self.options.decomp_file.write("%.64f %.64f %.64f %.64f\n"%(omegas[j],c_ns[j],Ps[j],Qs[j]))
                         self.options.decomp_file.flush()
                 Hb += np.sum((c_ns*Qs)[:])*self.baths[i].c_op
             if self.options.print_decomp:
+                np.save(self.options.ham_file+'_traj_%d'%(traj),Hb)
+                #np.save('new_hamiltonian_traj_%d'%(traj),Hb)
                 self.options.decomp_file.close()
 
             if self.hamtype=="default":

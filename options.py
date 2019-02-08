@@ -7,7 +7,7 @@ class Options(object):
 
     def __init__(self, verbose=True, really_verbose=False, progress=True,
                  method="rk4", space="hilbert", print_decomp=False, 
-                 decomp_file=None, ntraj=1000, traj_results=False, 
+                 decomp_file=None, ham_file=None, ntraj=1000, traj_results=False, 
                  traj_results_file=None, traj_states=False, traj_states_file=None,
                  traj_states_every=1, block_avg=False, nblocks=10, norm_steps=1000, 
                  norm_tol=1.e-3, seed=None, markov_time=np.inf, restart_file=None, 
@@ -32,6 +32,7 @@ class Options(object):
         self.print_decomp = print_decomp
         self._decomp_file = decomp_file
         self.decomp_file = None
+        self.ham_file = ham_file
 
         # sampling options #
         self.ntraj = ntraj
