@@ -133,6 +133,9 @@ class Redfield(Dynamics):
                     Ga_plus = Ga*theta_plus
                     self.C.append(Ga.copy())
                     self.E.append(Ga_plus.copy())
+                    if self.options.print_coup_ops:
+                        np.save(self.options.coup_ops_file+"c_op_%d"%(k),self.C[k])
+                        np.save(self.options.coup_ops_file+"e_op_%d"%(k),self.E[k])
             elif self.options.space == "liouville":
                 gamma_plus  += np.einsum('lj,ik,ik->ljik', Ga, Ga, theta_plus)
                 gamma_minus += np.einsum('lj,ik,lj->ljik', Ga, Ga, theta_plus.conj().T)
@@ -170,6 +173,8 @@ class Redfield(Dynamics):
 
         for op,bath in enumerate(self.ham.baths):
             self.C.append( self.ham.to_eigenbasis( bath.c_op ) )
+            if self.options.print_coup_ops:
+                np.save(self.options.coup_ops_file+"c_op_%d"%(op),self.C[op])
             self.gamma_n[op] = list()
             self.gamma_n_1[op] = list()
 
@@ -385,6 +390,9 @@ class Redfield(Dynamics):
                 elif self.options.really_verbose: print(i)
             if self.time_dep:
                 self.update_ops(tau)
+                if self.options.print_coup_ops:
+                    for j in range(len(self.E)):
+                        np.save(self.options.coup_ops_file+"e_op_%d_%d"%(j,i),self.E[j][0])
             if i%self.results.every==0:
                 if self.options.space == "hilbert":
                     if self.is_secular:
