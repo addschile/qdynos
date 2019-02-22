@@ -6,8 +6,9 @@ class Options(object):
     """
 
     def __init__(self, verbose=True, really_verbose=False, progress=True,
-                 method="rk4", space="hilbert", print_decomp=False, 
-                 decomp_file=None, ham_file=None, ntraj=1000, traj_results=False, 
+                 method="rk4", space="hilbert", print_coup_ops=False, 
+                 coup_ops_file=None, print_decomp=False, decomp_file=None, 
+                 ham_file=None, ntraj=1000, traj_results=False, 
                  traj_results_file=None, traj_states=False, traj_states_file=None,
                  traj_states_every=1, block_avg=False, nblocks=10, norm_steps=1000, 
                  norm_tol=1.e-3, seed=None, markov_time=np.inf, restart_file=None, 
@@ -25,6 +26,9 @@ class Options(object):
         # liouville or hilbert space #
         self.space = space
 
+        # Redfield/TCL2 options #
+        self.print_coup_ops = print_coup_ops
+        self.coup_ops_file = coup_ops_file
         # TCL2 options #
         self.markov_time = markov_time
 

@@ -70,8 +70,8 @@ class Frozen:
                         self.options.decomp_file.flush()
                 Hb += np.sum((c_ns*Qs)[:])*self.baths[i].c_op
             if self.options.print_decomp:
-                np.save(self.options.ham_file+'_traj_%d'%(traj),Hb)
-                #np.save('new_hamiltonian_traj_%d'%(traj),Hb)
+                if self.options.ham_file != None:
+                    np.save(self.options.ham_file+'_traj_%d'%(traj),Hb)
                 self.options.decomp_file.close()
 
             if self.hamtype=="default":
@@ -81,6 +81,9 @@ class Frozen:
 
             rho = rho0.copy()
             traj_results = deepcopy(results)
+            if self.options.print_coup_ops:
+                dynamics_copy.options.print_coup_ops = True
+                dynamics_copy.options.coup_ops_file = self.options.coup_ops_file + "_traj_%d"%(traj)
             if self.options.traj_results:
                 traj_results.print_es = True
                 traj_results.fes = open(self.options.traj_results_file+"_traj_%d"%(traj), "w")
