@@ -44,7 +44,26 @@ class Frozen:
                 PDs = [False]*self.nbath
             # compute decomposed spectral densities for each bath #
             for i in range(self.nbath):
-                self.baths[i].frozen_mode_decomp(omega_stars[i], PD=PDs[i])
+		if omega_stars[i] != 0:
+                    self.baths[i].frozen_mode_decomp(omega_stars[i], PD=PDs[i])
+
+    def sample_hamiltonians(self, nmodes=300, ntraj=1000, sample="Boltzmann"):
+        for traj in range(ntraj):
+            Hb = self.dynamics.ham.ham.copy()
+            if self.options.print_decomp:
+                self.options.decomp_file = open(self.options._decomp_file+"_traj_%d"%(traj), "w")
+            for i in range(self.nbath):
+		if omega_stars[i] != 0:
+                    omegas, c_ns, Ps, Qs = self.baths[i].sample_modes(nmodes, sample)
+                    if self.options.print_decomp:
+                        for j in range(len(c_ns)):
+                            self.options.decomp_file.write("%.64f %.64f %.64f %.64f\n"%(omegas[j],c_ns[j],Ps[j],Qs[j]))
+                            self.options.decomp_file.flush()
+                    Hb += np.sum((c_ns*Qs)[:])*self.baths[i].c_op
+            if self.options.print_decomp:
+                if self.options.ham_file != None:
+                    np.save(self.options.ham_file+'_traj_%d'%(traj),Hb)
+                self.options.decomp_file.close()
 
     def solve(self, rho0, times, nmodes=300, ntraj=1000, sample="Boltzmann", results=None):
         results_out = deepcopy(results)
