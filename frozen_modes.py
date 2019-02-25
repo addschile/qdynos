@@ -26,6 +26,7 @@ class Frozen:
             self.options = options
         self.hamtype = hamtype
         self.hbar = hbar
+        self.omega_stars = omega_stars
 
         if dynamics==None:
             if hamtype=="default":
@@ -44,8 +45,8 @@ class Frozen:
                 PDs = [False]*self.nbath
             # compute decomposed spectral densities for each bath #
             for i in range(self.nbath):
-        if omega_stars[i] != 0:
-            self.baths[i].frozen_mode_decomp(omega_stars[i], PD=PDs[i])
+                if omega_stars[i] != 0:
+                    self.baths[i].frozen_mode_decomp(omega_stars[i], PD=PDs[i])
 
     def sample_hamiltonians(self, nmodes=300, ntraj=1000, sample="Boltzmann"):
         for traj in range(ntraj):
@@ -53,7 +54,7 @@ class Frozen:
             if self.options.print_decomp:
                 self.options.decomp_file = open(self.options._decomp_file+"_traj_%d"%(traj), "w")
             for i in range(self.nbath):
-        if omega_stars[i] != 0:
+                if self.omega_stars[i] != 0:
                     omegas, c_ns, Ps, Qs = self.baths[i].sample_modes(nmodes, sample)
                     if self.options.print_decomp:
                         for j in range(len(c_ns)):
