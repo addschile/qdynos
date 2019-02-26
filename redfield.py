@@ -371,6 +371,8 @@ class Redfield(Dynamics):
 
     def propagate_eom(self, rho, times):
 
+        rho = self.ham.to_eigenbasis(rho.copy())
+
         if self.results.e_ops != None:
             for i in range(len(self.results.e_ops)):
                 self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
@@ -426,7 +428,6 @@ class Redfield(Dynamics):
         results : Results class
         """
         self.setup(times, results)
-        rho = self.ham.to_eigenbasis(rho0.copy())
 
         if self.options.verbose:
             print_stage("Initializing Coupling Operators")
@@ -445,4 +446,4 @@ class Redfield(Dynamics):
             print_time(etime-btime)
             print_stage("Propagating Equation of Motion")
 
-        return self.propagate_eom(rho, times)
+        return self.propagate_eom(rho0, times)

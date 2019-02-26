@@ -119,7 +119,7 @@ class Results(object):
         self.maps.append( self.map_function(state) )
 
     def print_state(self, ind, time, state):
-        np.save(self.states_file+str(ind), state)
+        np.save(self.states_file+"_"+str(ind), state)
 
     def analyze_state(self, ind, time, state):
         """
