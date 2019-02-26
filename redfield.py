@@ -11,7 +11,7 @@ from .dynamics import Dynamics
 from .utils import commutator,dag,to_liouville,from_liouville
 from .options import Options
 from .results import Results
-from .log import print_method,print_stage,print_progress,print_time
+from .log import *#print_method,print_stage,print_progress,print_time
 
 class Redfield(Dynamics):
     """Dynamics class for Redfield-like dynamics. Can perform both 
@@ -108,12 +108,12 @@ class Redfield(Dynamics):
             gamma_plus  = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
             gamma_minus = np.zeros((nstates,nstates,nstates,nstates),dtype=complex)
         for k,bath in enumerate(self.ham.baths):
-            if self.options.really_verbose: print("operator %d of %d"%(k+1,len(self.ham.baths)))
+            if self.options.really_verbose: print_basic("operator %d of %d"%(k+1,len(self.ham.baths)))
             Ga = self.ham.to_eigenbasis( bath.c_op )
             theta_zero = bath.ft_bath_corr(0.0)
             theta_plus = theta_zero*np.identity(nstates,dtype=complex)
             for i in range(nstates):
-                if self.options.really_verbose: print("%d rows of %d"%(i,nstates))
+                if self.options.really_verbose: print_basic("%d rows of %d"%(i,nstates))
                 for j in range(nstates):
                     if i!=j:
                         theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
@@ -387,7 +387,7 @@ class Redfield(Dynamics):
                 if i%int(self.tobs/10)==0:
                     etime = time()
                     print_progress((100*i/self.tobs),(etime-btime))
-                elif self.options.really_verbose: print(i)
+                elif self.options.really_verbose: print_basic(i)
             if self.time_dep:
                 self.update_ops(tau)
                 if self.options.print_coup_ops:
