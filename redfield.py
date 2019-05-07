@@ -384,6 +384,7 @@ class Redfield(Dynamics):
             rho = np.diag(rho.copy())
         self.ode._set_y_value(rho, times[0])
         btime = time()
+        td_switch = 1
         for i,tau in enumerate(times):
             if self.options.progress:
                 if i%int(self.tobs/10)==0:
@@ -391,7 +392,15 @@ class Redfield(Dynamics):
                     print_progress((100*i/self.tobs),(etime-btime))
                 elif self.options.really_verbose: print_basic(i)
             if self.time_dep:
-                self.update_ops(tau)
+                if tau < self.options.markov_time:
+                    self.update_ops(tau)
+                else:
+                    if td_switch:
+                        for j in range(len(self.C)):
+                            self.E[j] = list()
+                            for k in range(self.ode.order):
+                                self.E[j].append(self.gamma_n[j][-1]*self.C[j])
+                    td_switch = 0
                 if self.options.print_coup_ops:
                     for j in range(len(self.E)):
                         np.save(self.options.coup_ops_file+"e_op_%d_%d"%(j,i),self.E[j][0])
