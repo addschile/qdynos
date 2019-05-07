@@ -83,12 +83,14 @@ class Frozen:
             if self.options.print_decomp:
                 self.options.decomp_file = open(self.options._decomp_file+"_traj_%d"%(traj), "w")
             for i in range(self.nbath):
-                omegas, c_ns, Ps, Qs = self.baths[i].sample_modes(nmodes, sample)
-                if self.options.print_decomp:
-                    for j in range(len(c_ns)):
-                        self.options.decomp_file.write("%.64f %.64f %.64f %.64f\n"%(omegas[j],c_ns[j],Ps[j],Qs[j]))
-                        self.options.decomp_file.flush()
-                Hb += np.sum((c_ns*Qs)[:])*self.baths[i].c_op
+                if self.omega_stars[i] != 0:
+                    omegas, c_ns, Ps, Qs = self.baths[i].sample_modes(nmodes, sample)
+                    if self.options.print_decomp:
+                        for j in range(len(c_ns)):
+                            self.options.decomp_file.write("%.64f %.64f %.64f %.64f\n"%(omegas[j],c_ns[j],Ps[j],Qs[j]))
+                            self.options.decomp_file.flush()
+                    print_basic("reorganization energy: %.16f\n"%(np.sum((c_ns*Qs)[:])))
+                    Hb += np.sum((c_ns*Qs)[:])*self.baths[i].c_op
             if self.options.print_decomp:
                 if self.options.ham_file != None:
                     np.save(self.options.ham_file+'_traj_%d'%(traj),Hb)
