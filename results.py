@@ -1,6 +1,7 @@
 from __future__ import print_function,absolute_import
 import numpy as np
 from .utils import dag,is_vector,is_matrix
+from .log import print_basic
 
 def add_results(results1, results2, weight=None):
     """
@@ -43,8 +44,10 @@ class Results(object):
     Results class that helps organize and print out relevant results.
     """
 
-    def __init__(self, tobs=None, e_ops=None, print_es=False, es_file=None, map_ops=False, store_states=False, 
-        print_states=False, states_file=None, states_every=1, jump_stats=False, every=1):
+    def __init__(self, tobs=None, e_ops=None, print_es=False, es_file=None, 
+                 map_ops=False, store_states=False, print_final=False, 
+                 final_file=None, final_every=1, print_states=False, 
+                 states_file=None, states_every=1, jump_stats=False, every=1):
         """
         Initialize results class.
 
@@ -82,6 +85,12 @@ class Results(object):
         self.states = None
         if self.store_states:
             self.states = list()
+        # print dynamic state info #
+        self.print_final = print_final
+        self.final_file = None
+        if self.print_final:
+            self.final_file = final_file
+        self.final_every = final_every
         # print states info #
         self.print_states = print_states
         self.states_file = None
@@ -118,6 +127,9 @@ class Results(object):
     def mapping_expect(self, state):
         self.maps.append( self.map_function(state) )
 
+    def print_final_state(self, state):
+        np.save(self.final_file, state)
+
     def print_state(self, ind, time, state):
         np.save(self.states_file+"_"+str(ind), state)
 
@@ -127,6 +139,10 @@ class Results(object):
         """
         if self.store_states:
             self.states.append( state.copy() )
+        if self.print_final:
+            if ind%self.final_every==0:
+                self.print_final_state(state)
+                print_basic("last state printed: %d, %.8f"%(ind,time))
         if self.print_states:
             if ind%self.states_every==0:
                 self.print_state(ind, time, state)
