@@ -136,6 +136,7 @@ class Bath(object):
         JCP 143, 194108 (2015).
         JCP 136, 034113 (2012).
         """
+        self.omega_star = omega_star
         self.Jslow = lambda w: switch(w,omega_star)*self.spectral_density_func(w)
         if PD:
             self.Jfast = lambda w: (1.-switch(w,omega_star))*self.spectral_density_func(w) +\
@@ -174,15 +175,17 @@ class OhmicExp(Bath):
     -----
     J(\omega) = \eta \omega e^{- \omega / \omega_c}
     """
-    def __init__(self, eta, wc, kT, op=None):
+    def __init__(self, eta, wc, kT, op=None, disc='log'):
         self.type = "ohmic exponential"
         self.eta = eta
         self.wc = wc
-        self.omega_inf = 20.*wc
+        self.omega_inf = 50.*wc
         self.kT = kT
         self.c_op = op
         self.J_omega = self.spectral_density_func
         self.J0 = self.spectral_density_limit_at_zero
+        assert(disc in ['log', 'uniform'])
+        self.disc = disc
 
     def spectral_density_func(self, w):
         return ohmic_exp(w,self.eta,self.wc)
@@ -202,9 +205,16 @@ class OhmicExp(Bath):
         return self.eta*self.wc/np.pi
 
     def compute_omegas(self, nmodes):
-        omegas = np.array([self.wc*(-np.log((nmodes-i-0.5)/nmodes)) for i in range(nmodes)])
-        rho_slow = (nmodes/self.wc)*np.exp(-omegas/self.wc)/self.wc
-        c_ns = np.array([np.sqrt((2./np.pi)*omegas[i]*self.Jslow(omegas[i]))/rho_slow[i] for i in range(nmodes)])
+        if self.disc == 'log':
+            # smart discretization
+            omegas = np.array([self.wc*(-np.log((nmodes-i-0.5)/nmodes)) for i in range(nmodes)])
+            rho_slow = (nmodes/self.wc)*np.exp(-omegas/self.wc)/self.wc
+            c_ns = np.array([np.sqrt((2./np.pi)*omegas[i]*self.Jslow(omegas[i])/rho_slow[i]) for i in range(nmodes)])
+        elif self.dis == 'uniform':
+            # naive discretization
+            dw = self.omega_star/nmodes
+            omegas = np.array([(i+0.5)*dw for i in range(nmodes)])
+            c_ns = np.array([np.sqrt((2./np.pi)*omegas[i]*self.Jslow(omegas[i])*dw) for i in range(nmodes)])
         return omegas, c_ns
 
 @jit(double(double, double, double),nopython=True)
@@ -224,7 +234,7 @@ class DebyeBath(Bath):
     -----
     J(\omega) = \eta \omega / (\omega^2 + \omega_c^2)
     """
-    def __init__(self, eta, wc, kT, op=None):
+    def __init__(self, eta, wc, kT, op=None, disc='log'):
         self.type = "debye"
         self.eta = eta
         self.wc = wc
@@ -233,6 +243,8 @@ class DebyeBath(Bath):
         self.c_op = op
         self.J_omega = self.spectral_density_func
         self.J0 = self.spectral_density_limit_at_zero
+        assert(disc in ['log'])
+        self.disc = disc
 
     def spectral_density_func(self, w):
         return debye(w,self.eta,self.wc)
@@ -252,9 +264,10 @@ class DebyeBath(Bath):
         return 0.5*self.eta/self.wc
 
     def compute_omegas(self, nmodes):
-        omegas = np.array([self.wc*np.tan(0.5*np.pi*(float(i)+0.5)/nmodes) for i in range(nmodes)])
-        rho_slow = 2.*(nmodes/np.pi)/(1.+(omegas/self.wc)**2.)/self.wc
-        c_ns = np.array([ np.sqrt((2./np.pi)*omegas[i]*self.Jslow(omegas[i])/rho_slow[i]) for i in range(nmodes) ])
+        if self.disc == 'log':
+            omegas = np.array([self.wc*np.tan(0.5*np.pi*(float(i)+0.5)/nmodes) for i in range(nmodes)])
+            rho_slow = 2.*(nmodes/np.pi)/(1.+(omegas/self.wc)**2.)/self.wc
+            c_ns = np.array([ np.sqrt((2./np.pi)*omegas[i]*self.Jslow(omegas[i])/rho_slow[i]) for i in range(nmodes) ])
         return omegas, c_ns
 
 @jit(double(double,double[:],double[:],double[:]),nopython=True)
