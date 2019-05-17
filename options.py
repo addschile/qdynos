@@ -28,7 +28,13 @@ class Options(object):
 
         # Redfield/TCL2 options #
         self.print_coup_ops = print_coup_ops
-        self.coup_ops_file = coup_ops_file
+        if self.print_coup_ops:
+            if coup_ops_file == None:
+                self.coup_ops_file = ''
+            else:
+                self.coup_ops_file = coup_ops_file
+        else:
+            self.coup_ops_file = coup_ops_file
         # TCL2 options #
         self.markov_time = markov_time
 

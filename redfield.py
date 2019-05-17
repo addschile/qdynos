@@ -119,6 +119,9 @@ class Redfield(Dynamics):
                         theta_plus[i,j] = bath.ft_bath_corr(-self.ham.omegas[i,j])
             if self.options.space == "hilbert":
                 if self.is_secular:
+                    if self.options.print_coup_ops:
+                        np.save(self.options.coup_ops_file+"c_op_%d"%(k),Ga)
+                        np.save(self.options.coup_ops_file+"theta_plus_%d"%(k),theta_plus)
                     # population transfer matrix
                     self.prop += 2.*np.einsum('ji,ij,ij->ij',Ga,Ga,theta_plus.real)/const.hbar**2.
                     # dephasing matrix
