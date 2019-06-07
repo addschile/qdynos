@@ -183,6 +183,7 @@ class OhmicExp(Bath):
         self.kT = kT
         self.c_op = op
         self.J_omega = self.spectral_density_func
+        self.Jslow = self.spectral_density_func
         self.J0 = self.spectral_density_limit_at_zero
         assert(disc in ['log', 'uniform'])
         self.disc = disc
@@ -242,6 +243,7 @@ class DebyeBath(Bath):
         self.kT = kT
         self.c_op = op
         self.J_omega = self.spectral_density_func
+        self.Jslow = self.spectral_density_func
         self.J0 = self.spectral_density_limit_at_zero
         assert(disc in ['log'])
         self.disc = disc
@@ -296,6 +298,7 @@ class MeierTannor(Bath):
         self.kT = kT
         self.c_op = op
         self.J_omega = self.spectral_density_func
+        self.Jslow = self.spectral_density_func
         self.J0 = self.spectral_density_limit_at_zero
 
     def spectral_density_func(self, w):

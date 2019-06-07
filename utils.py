@@ -6,6 +6,9 @@ def dag(op):
 def commutator(op1,op2):
     return np.dot(op1,op2) - np.dot(op2,op1)
 
+def anticommutator(op1,op2):
+    return np.dot(op1,op2) + np.dot(op2,op1)
+
 def norm(psi):
     if is_vector(psi):
         return np.dot(dag(psi),psi)[0,0].real

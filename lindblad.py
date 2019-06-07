@@ -1,27 +1,16 @@
 from __future__ import print_function,absolute_import
 
 import numpy as np
+from time import time
+
 import qdynos.constants as const
 
 from .integrator import Integrator
 from .dynamics import Dynamics
-from .utils import commutator,dag,to_liouville
+from .utils import commutator,anticommutator,dag
 from .options import Options
 from .results import Results
-from numba import jit
-
-@jit
-def lb_deriv(rho,A,L0,LdL):
-    drho = np.dot(A,rho) + np.dot(rho,dag(A))
-    for i in range(len(L0)):
-        drho += 2.0*np.dot(L0[i] , np.dot(rho , dag(L0[i])))
-        drho -= np.dot(dag(L0[i]), np.dot(L0[i],rho))
-        drho -= np.dot(rho, np.dot(dag(L0[i]), L0[i]))
-    for i in range(len(LdL)):
-        drho[ LdL[i][1][0] , LdL[i][1][0] ] +=  2.0*rho[ LdL[i][1][1] , LdL[i][1][1] ]*LdL[i][0]
-        drho[ LdL[i][1][1] , :] -=  rho[ LdL[i][1][1] , :]*LdL[i][0]
-        drho[ : , LdL[i][1][1] ] -= rho[ : , LdL[i][1][1]]*LdL[i][0]
-    return drho
+from .log import *
 
 class Lindblad(Dynamics):
     """
@@ -34,7 +23,9 @@ class Lindblad(Dynamics):
         self.ham = ham
         self.time_dep = time_dependent
 
-    def setup(self, options, results):
+    def setup(self, gam, L, options, results):
+        """
+        """
         # generic setup
         if options==None:
             self.options = Options()
@@ -46,70 +37,62 @@ class Lindblad(Dynamics):
             self.results = Results()
         else:
             self.results = results
-            if self.results.map_ops:
-                assert(repr(self.ham)=="Multidimensional Hamiltonian class")
-                self.results.map_function = self.ham.compute_coordinate_surfaces
 
         self.ode = Integrator(self.dt, self.eom, self.options)
-        self.make_lindblad_operators()
+        if isinstance(L, list):
+            self.gam_re = gam.real
+            self.gam_im = gam.imag
+            self.L = L.copy()
+        else:
+            self.gam_re = np.array([gam.real])
+            self.gam_im = np.array([gam.imag])
+            self.L = [L.copy()]
+        self.compute_lamb_shift()
 
-    def make_lindblad_operators(self):
+    def compute_lamb_shift(self):
         """
         """
         nstates = self.ham.nstates
+        # TODO this complicates things with the Hamiltonian class
+        # TODO potential fix: define Hamiltonian class inside of this class and only init with a matrix hamiltonian
+        #lamb = np.zeros((nstates,nstates),dtype=complex)
+        for i in range(len(self.L)):
+            self.L[i] = self.ham.to_eigenbasis(self.L[i])
+        #    lamb += self.gam_im[i]*np.dot(dag(self.L[i]),self.L[i])
 
-        # compute unique frequencies
-        self.ham.compute_unique_freqs()
-
-        self.hcorr = np.zeros((nstates,nstates),dtype=complex)
-        self.Ls = []
-        self.LdL = []
-        self.L0 = []
-        for k,bath in enumerate(self.ham.baths):
-            Ga = self.ham.to_eigenbasis( bath.c_op )
-            for i in range(len(self.ham.frequencies)):
-                if self.ham.frequencies[i] != 0:
-                    omega = self.ham.frequencies[i]
-                    cf_real = bath.ft_bath_corr(-omega).real
-                    cf_imag = bath.ft_bath_corr(-omega).imag
-                    proj = np.zeros((nstates,nstates))
-                    for j in range(nstates):
-                        for k in range(nstates):
-                            omega = self.ham.omegas[j,k]
-                            if omega==self.ham.frequencies[i]:
-                                proj[j,k] = 1.
-                    L = proj*Ga
-                    self.hcorr += (cf_imag*np.dot(dag(L),L))
-                    L *= np.sqrt(cf_real)
-                    self.Ls.append( L.copy() )
-                    if self.ham.frequencies[i] == 0.:
-                        self.L0.append(L.copy())
-                    else:
-                        for j in range(nstates):
-                            for k in range(nstates):
-                                if L[j,k] != 0.:
-                                    ldl_list = [] # first list is for |L_mn|^2 the second is for [m,n]
-                                    ldl_list.append( np.conj(L[j,k])*L[j,k] ) # store |L_jk|^2
-                                    ldl_list.append([j,k]) # store jk
-                                    self.LdL.append(ldl_list)
-
-        self.A  = (-1.j/const.hbar)*(self.ham.Heig + self.hcorr)
+    #def eom(self, state, order):
+    #    drho = (-1.j/const.hbar)*self.ham.commutator(state)
+    #    for i in range(len(self.L)):
+    #               # TODO make gam a function to account for time-dependence
+    #        rho += self.gam[i]*(np.dot(L, np.dot(rho, dag(L))) - 0.5*anticommutator(np.dot(dag(L),L),rho))
+    #    return drho
 
     def eom(self, state, order):
-        return lb_deriv(state,self.A,self.L0,self.LdL)
+        drho = (-1.j/const.hbar)*self.ham.commutator(state)
+        for i in range(len(self.L)):
+            drho += self.gam_re[i]*(np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(np.dot(dag(self.L[i]),self.L[i]), state))
+        return drho
 
-    def solve(self, rho0, times, options=None, results=None):
+    def solve(self, rho0, times, gam, L, options=None, results=None):
         """
         """
         self.dt = times[1]-times[0]
-        self.setup(options, results)
+        self.tobs = len(times)
+        self.setup(gam, L, options, results)
         rho = self.ham.to_eigenbasis(rho0.copy())
+        if self.results.e_ops != None:
+            for i in range(len(self.results.e_ops)):
+                self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
 
         self.ode._set_y_value(rho, times[0])
-        for i,time in enumerate(times):
+        btime = time()
+        for i,tau in enumerate(times):
+            if self.options.progress:
+                if i%int(self.tobs/10)==0:
+                    etime = time()
+                    print_progress((100*i/self.tobs),(etime-btime))
             if i%self.results.every==0:
-                if self.options.progress: print(i)
-                self.results.analyze_state(i, time, self.ham.from_eigenbasis(self.ode.y))
+                self.results.analyze_state(i, tau, self.ode.y)
             self.ode.integrate()
 
         return self.results
