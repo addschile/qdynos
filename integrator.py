@@ -46,15 +46,19 @@ class Integrator(object):
         self.t = t
         return
 
-    def exact_integrate(self):
+    def exact_integrate(self, renorm=0, change_dt=1):
         """
         This integration will directly update the function based on an exact
         solution of the equation of motion.
         """
         self.y = self.eom(self.y, 0)
-        self.t += self.dt
 
-    def rk4_integrate(self, renorm=0):
+        if change_dt:
+            self.t += self.dt
+        if renorm:
+            self.y /= np.sqrt(norm(self.y))
+
+    def rk4_integrate(self, renorm=0, change_dt=1):
         """
         This integration uses 4-th order Runge-Kutta to update the function
         based on the equation of motion.
@@ -68,10 +72,10 @@ class Integrator(object):
 
         self.y += dy
 
+        if change_dt:
+            self.t += self.dt
         if renorm:
             self.y /= np.sqrt(norm(self.y))
-
-        self.t += self.dt
 
     def rk4_integrate_range(self, t0, t, renorm=1, change_dt=0):
         """

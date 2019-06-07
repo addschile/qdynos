@@ -11,8 +11,8 @@ class Options(object):
                  ham_file=None, ntraj=1000, traj_results=False, 
                  traj_results_file=None, traj_states=False, traj_states_file=None,
                  traj_states_every=1, block_avg=False, nblocks=10, norm_steps=1000, 
-                 norm_tol=1.e-3, seed=None, markov_time=np.inf, restart_file=None, 
-                 restart=False):
+                 norm_tol=1.e-3, seed=None, markov_time=np.inf, unraveling=False,
+                 which_unraveling='jump', restart_file=None, restart=False):
 
         # program run options #
         self.verbose = verbose
@@ -44,7 +44,7 @@ class Options(object):
         self.decomp_file = None
         self.ham_file = ham_file
 
-        # sampling options #
+        # trajectory sampling options #
         self.ntraj = ntraj
         self.traj_results = traj_results
         self.traj_results_file = traj_results_file
@@ -57,6 +57,11 @@ class Options(object):
         self.seed = seed
 
         # unraveling options #
+        self.unraveling = unraveling
+        self.which_unraveling = which_unraveling
+        if self.unraveling:
+            if self.which_unraveling=='jump':
+                self.method = 'exact'
         self.norm_steps = norm_steps
         self.norm_tol = norm_tol
 

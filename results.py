@@ -31,8 +31,6 @@ def add_results(results1, results2, weight=None):
         return results1
 
 def avg_results(ntraj, results):
-    #if results.store_states:
-    #    results.states /= float(ntraj)
     if results.e_ops != None:
         results.expect /= float(ntraj)
     if results.map_ops:
