@@ -123,7 +123,8 @@ class Lindblad(Dynamics):
 
     def eom(self, state, order):
         #drho = (-1.j/const.hbar)*self.ham.commutator(state)
-        drho = (-1.j/const.hbar)*commutator(self.A,state)
+        #drho = (-1.j/const.hbar)*commutator(self.A,state)
+        drho = commutator(self.A,state)
         for i in range(len(self.L)):
             drho += self.gam_re[i]*(np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
         return drho
