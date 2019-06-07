@@ -63,17 +63,22 @@ class Results(object):
         # how often do we compute results #
         self.every = every
         # expectation value containers #
-        self.e_ops = e_ops
         self.expect = None
         self.print_es = print_es
         self.fes = None
-        if self.e_ops != None:
+        if e_ops != None:
+            if isinstance(e_ops, list):
+                self.e_ops = e_ops
+            else:
+                self.e_ops = [e_ops]
             if self.print_es:
                 if es_file==None:
                     self.fes = open("output.dat","w")
                 else:
                     self.fes = open(es_file,"w")
             self.expect = np.zeros((len(self.e_ops),tobs))
+        else:
+            self.e_ops = e_ops
         # mapping expectation value containers #
         self.map_ops = map_ops
         if self.map_ops:
