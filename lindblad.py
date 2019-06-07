@@ -7,12 +7,13 @@ import qdynos.constants as const
 
 from .integrator import Integrator
 from .dynamics import Dynamics
-from .utils import commutator,anticommutator,dag,is_vector,is_matrix
+from .utils import commutator,anticommutator,dag,norm,is_vector,is_matrix
 from .options import Options
 from .results import Results,add_results,avg_results
 from .log import *
 
 from scipy.linalg import expm
+from copy import deepcopy
 
 class Lindblad(Dynamics):
     """
@@ -33,8 +34,9 @@ class Lindblad(Dynamics):
             self.options = Options()
         else:
             self.options = options
-            if self.options.method == "exact":
-                raise NotImplementedError
+            if not self.options.unraveling:
+                if self.options.method == "exact":
+                    raise NotImplementedError
 
         # results setup
         if results==None:
@@ -74,11 +76,12 @@ class Lindblad(Dynamics):
             lamb += self.gam_im[i]*np.dot(dag(self.L[i]),self.L[i])
         self.A = self.ham.Heig + lamb
 
+        self.A *= -1.j/const.hbar
+
         if self.options.unraveling:
             # add non-hermitian term
             for i in range(len(self.L)):
                 self.A -= 0.5*self.gam_re[i]*np.dot(dag(self.L[i]),self.L[i])
-            self.A *= -1.j
 
         # make list of L^\dagger L for faster computations
         self.LdL = []
@@ -95,7 +98,7 @@ class Lindblad(Dynamics):
 
     def jump_probs(self, psi):
         p_n = np.zeros(len(self.L))
-        for i in range(len(LdL)):
+        for i in range(len(self.LdL)):
             p_n[i] = np.dot(dag(psi), np.dot(self.LdL[i], psi))[0,0].real
         p = np.sum(p_n)
         return p_n , p
@@ -108,12 +111,12 @@ class Lindblad(Dynamics):
         # see which one it jumped along
         psi_out = np.zeros_like(psi)
         p *= rand
-        for count in range(len(L)):
+        for count in range(len(self.L)):
             if p <= np.sum(p_n[:count+1]):
-                psi_out = np.dot(self.L[i], psi)
+                psi_out = np.dot(self.L[count], psi)
                 return psi_out/np.sqrt(p_n[count]) , count
     
-        assert(count<len(L))
+        assert(count<len(self.L))
 
     def eom_jump(self, state, order):
         return np.dot(self.expmA, state)
@@ -125,7 +128,7 @@ class Lindblad(Dynamics):
             drho += self.gam_re[i]*(np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
         return drho
 
-    def integrate_trajectories(self, psi0, times):
+    def integrate_trajectories(self, psi0, times, ntraj):
 
         if self.options.seed==None:
             seeder = int(time())
@@ -138,7 +141,12 @@ class Lindblad(Dynamics):
         dt = times[1]-times[0]
         self.expmA = expm(self.A*dt)
     
-        for i in range(self.options.ntraj):
+        btime = time()
+        for i in range(ntraj):
+            if self.options.progress:
+                if i%int(ntraj/10)==0:
+                    etime = time()
+                    print_progress((100*i/ntraj),(etime-btime))
             njumps = 0
             jumps = []
     
@@ -181,7 +189,7 @@ class Lindblad(Dynamics):
                     ii = 0
                     t_final = t_next
     
-                    while ii < norm_steps:
+                    while ii < self.options.norm_steps:
     
                         ii += 1
     
@@ -198,14 +206,14 @@ class Lindblad(Dynamics):
                         norm_guess = norm(self.ode.y)
     
                         # determine what to do next
-                        if (np.abs(norm_guess - rand) <= (norm_tol*rand)):
+                        if (np.abs(norm_guess - rand) <= (self.options.norm_tol*rand)):
                             # t_guess was right!
                             t = t_guess
     
                             # jump
                             self.ode.y /= np.sqrt(norm_guess)
                             rand = np.random.uniform()
-                            self.ode.y , ind = jump(rand,self.ode.y)
+                            self.ode.y , ind = self.jump(rand, self.ode.y)
                             jumps.append( [t,ind] )
 
                             # integrate up to t_next
@@ -228,7 +236,7 @@ class Lindblad(Dynamics):
                             t_prev = t_guess
                             psi_prev = self.ode.y.copy()
                             norm_prev = norm_guess
-                        if ii == norm_steps:
+                        if ii == self.options.norm_steps:
                             raise ValueError("Couldn't find jump time")
                 else:
                     # no jump occurred
@@ -236,12 +244,13 @@ class Lindblad(Dynamics):
                     # renormalize the tracking wavefunction
                     psi_track /= np.sqrt(norm(psi_track))
 
-            results_traj.store_jumps(njumps, jumps)
+            if self.results.jump_stats:
+                results_traj.store_jumps(njumps, jumps)
             add_results(self.results, results_traj)
 
         return avg_results(ntraj, self.results)
 
-    def solve(self, rho0, times, gam, L, options=None, results=None):
+    def solve(self, rho0, times, gam, L, ntraj=1000, options=None, results=None):
         """
         """
         self.dt = times[1]-times[0]
@@ -251,19 +260,19 @@ class Lindblad(Dynamics):
             for i in range(len(self.results.e_ops)):
                 self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
 
-        btime = time()
         if self.options.unraveling:
             if is_vector(rho0):
                 psi0 = self.ham.to_eigenbasis(rho0.copy())
             else:
                 raise AttributeError("Initial condition must be a wavefunction")
-            return self.integrate_trajectories(psi0, times)
+            return self.integrate_trajectories(psi0, times, ntraj)
         else:
             if is_matrix(rho0):
                 rho = self.ham.to_eigenbasis(rho0.copy())
                 self.ode._set_y_value(rho, times[0])
             else:
                 raise AttributeError("Initial condition must be a density matrix")
+            btime = time()
             for i,tau in enumerate(times):
                 if self.options.progress:
                     if i%int(self.tobs/10)==0:

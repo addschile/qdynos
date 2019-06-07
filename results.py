@@ -96,9 +96,10 @@ class Results(object):
             self.states_file = states_file
         self.states_every = states_every
         # jump statistics containers #
+        self.jump_stats = jump_stats
         self.jumps = None
         self.jump_times = None
-        if jump_stats:
+        if self.jump_stats:
             self.jumps = list()
 
     def close_down(self):
@@ -158,3 +159,9 @@ class Results(object):
 
     def store_jumps(self, njumps, jumps):
         self.jumps.append( [njumps, jumps.copy()] )
+
+    def print_expectation(self, es_file=None):
+        if es_file==None:
+            np.savetxt('expectation_values', self.expect.T)
+        else:
+            np.savetxt(es_file, self.expect.T)
