@@ -48,7 +48,8 @@ class Lindblad(Dynamics):
         if self.options.unraveling:
             if self.options.which_unraveling == 'jump':
                 print_method("Lindblad w/ Jumps")
-                self.ode = Integrator(self.dt, self.eom_jump, self.options)
+                self.options.method = 'exact'
+                #self.ode = Integrator(self.dt, self.eom_jump, self.options)
         else:
             print_method("Lindblad QME")
             self.ode = Integrator(self.dt, self.eom, self.options)
@@ -69,24 +70,24 @@ class Lindblad(Dynamics):
         """
         nstates = self.ham.nstates
         lamb = np.zeros((nstates,nstates),dtype=complex)
+        self.LdL = []
         for i in range(len(self.L)):
             # transform lindblad operators into eigenbasis
             self.L[i] = self.ham.to_eigenbasis(self.L[i])
+            # make list of L^\dagger L for faster computations
+            self.LdL.append( np.dot(dag(self.L[i]),self.L[i]) )
+            self.L[i] *= np.sqrt(self.gam_re[i])
             # compute lamb 
-            lamb += self.gam_im[i]*np.dot(dag(self.L[i]),self.L[i])
+            lamb += self.gam_im[i]*self.LdL[i]
+            self.LdL[i] *= self.gam_re[i]
         self.A = self.ham.Heig + lamb
-
-        self.A *= -1.j/const.hbar
 
         if self.options.unraveling:
             # add non-hermitian term
             for i in range(len(self.L)):
-                self.A -= 0.5*self.gam_re[i]*np.dot(dag(self.L[i]),self.L[i])
+                self.A -= 0.5j*self.LdL[i]
 
-        # make list of L^\dagger L for faster computations
-        self.LdL = []
-        for i in range(len(self.L)):
-            self.LdL.append( np.dot(dag(self.L[i]),self.L[i]) )
+        self.A *= -1.j/const.hbar
 
     # TODO make time-dependent version
     #def eom_td(self, state, order):
@@ -126,7 +127,8 @@ class Lindblad(Dynamics):
         #drho = (-1.j/const.hbar)*commutator(self.A,state)
         drho = commutator(self.A,state)
         for i in range(len(self.L)):
-            drho += self.gam_re[i]*(np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
+            #drho += self.gam_re[i]*(np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
+            drho += (np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
         return drho
 
     def integrate_trajectories(self, psi0, times, ntraj):
@@ -139,15 +141,17 @@ class Lindblad(Dynamics):
             np.random.seed( seeder )
             
         # initialize integrator class
-        dt = times[1]-times[0]
-        self.expmA = expm(self.A*dt)
+        self.expmA = expm(self.A*self.dt)
     
         btime = time()
         for i in range(ntraj):
             if self.options.progress:
-                if i%int(ntraj/10)==0:
-                    etime = time()
-                    print_progress((100*i/ntraj),(etime-btime))
+                if ntraj >= 10:
+                    if i%int(ntraj/10)==0:
+                        etime = time()
+                        print_progress((100*i/ntraj),(etime-btime))
+                else:
+                    print_basic(i)
             njumps = 0
             jumps = []
     
@@ -157,6 +161,7 @@ class Lindblad(Dynamics):
             rand = np.random.uniform()
     
             # set initial value of the integrator
+            self.ode = Integrator(self.dt, self.eom_jump, self.options)
             self.ode._set_y_value(psi0.copy(), t)
             psi_track = psi0.copy()
     
