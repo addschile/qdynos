@@ -4,7 +4,7 @@ class Dynamics():
     """
     Abstract base class for dynamics.
     """
-    __metaclass__=ABCMeta
+    __metaclass__ = ABCMeta
     def __init__(self, hamiltonian):
         """Initialize the Dynamics class.
 

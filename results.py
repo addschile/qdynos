@@ -1,6 +1,6 @@
 from __future__ import print_function,absolute_import
 import numpy as np
-from .utils import dag,is_vector,is_matrix
+from .utils import dag,is_vector,is_matrix,norm
 from .log import print_basic
 
 def add_results(results1, results2, weight=None):
@@ -111,18 +111,24 @@ class Results(object):
         if self.fes != None and self.fes.closed == False:
             self.fes.close()
 
-    def compute_expectation(self, ind, state):
+    def compute_expectation(self, ind, state, normalized=False):
         """
         Computes expectation values.
         """
         if is_vector(state):
             for i,e_op in enumerate(self.e_ops):
-                self.expect[i,ind] = np.dot(state.conj().T, np.dot(e_op,state))[0,0].real
+                if normalized:
+                    nrm = norm(state)
+                else: norm = 1.0
+                self.expect[i,ind] = np.dot(state.conj().T, np.dot(e_op,state))[0,0].real/nrm
                 if self.print_es:
                     self.fes.write('%.8f '%(self.expect[i,ind]))
         elif is_matrix(state):
             for i,e_op in enumerate(self.e_ops):
-                self.expect[i,ind] = np.trace( np.dot(e_op,state) ).real
+                if normalized:
+                    nrm = norm(state)
+                else: norm = 1.0
+                self.expect[i,ind] = np.trace( np.dot(e_op,state) ).real/nrm
                 if self.print_es:
                     self.fes.write('%.8f '%(self.expect[i,ind]))
         else:

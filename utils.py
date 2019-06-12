@@ -1,4 +1,12 @@
 import numpy as np
+# TODO
+"""
+I should change these to be general to take in either numpy matrices or 
+scipy sparse matrices
+
+I'll need to go back through the whole code to make sure that every bit
+of linear algebra is called from here
+"""
 
 def dag(op):
     return op.conj().T
