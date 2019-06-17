@@ -23,6 +23,15 @@ def print_time(tau):
     sys.stdout.write("Elapsed time: %.8f\n"%(tau))
     sys.stdout.flush()
 
+def print_warning(line):
+    warning = "Warning"
+    nchar = len(warning)
+    sys.stdout.write("#"*40+"\n")
+    sys.stdout.write("#"+" "*int((40-2-nchar)/2)+warning+" "*int((40-2-nchar)/2)+" #"+"\n")
+    sys.stdout.write("#"*40+"\n")
+    sys.stdout.write(line+"\n")
+    sys.stdout.flush()
+
 # TODO add classes to handle logging
 #class Log:
 #    import logging
