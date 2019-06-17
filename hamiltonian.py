@@ -4,11 +4,10 @@ import qdynos.constants as const
 from .utils import dag,is_hermitian,is_vector,is_matrix
 
 class Hamiltonian(object):
-    """
-    Base Hamiltonian class.
+    """Base Hamiltonian class.
     """
 
-    def __init__(self, H, nstates=None, baths=None, hbar=1.):
+    def __init__(self, H, nstates=None, baths=None, units='au', convert=None):
         """
         Parameters
         ----------
@@ -18,16 +17,18 @@ class Hamiltonian(object):
             Number that specifies the size of Hilbert space
         bath: list of Bath classes
             Baths that independently couple to the system
-        hbar: float
+        units: string
+        TODO convert: bool?
         """
-        const.hbar = hbar
+        # TODO want this to be a setter, but whatever
+        const.hbar = const.get_hbar(units)
+        # TODO add unit conversion here
         if nstates==None:
             self.nstates = H.shape[0]
         else:
             self.nstates = nstates
         self.check_hermiticity(H)
         self.ham = H
-        self.eigensystem()
         self.baths = baths
         if self.baths != None: self.nbaths = len(self.baths)
         
@@ -39,27 +40,30 @@ class Hamiltonian(object):
         return np.diag(self.ev)
 
     def check_hermiticity(self, H):
-        """
-        Check hermiticity of the Hamiltonian
-        """
+        """Check hermiticity of the Hamiltonian."""
         if is_hermitian(H):
             self.is_hermitian = True
         else:
             raise ValueError('Hamiltonian is not Hermitian')
 
     def eigensystem(self):
+        """Computes eigenvalues and eigenvectors of Hamiltonian."""
         self.ev,self.ek = np.linalg.eigh(self.ham)
         self.ev = self.ev[:self.nstates]
         self.compute_frequencies()
 
     def compute_frequencies(self):
+        """Computes frequencies of Hamiltonian."""
+        # TODO use map or pool for this
         self.omegas = np.array([[(self.ev[i]-self.ev[j]) for j in range(self.nstates)]
                                     for i in range(self.nstates)])/const.hbar
 
     def compute_unique_freqs(self):
+        """Computes unique frequencies of Hamiltonian."""
         self.frequencies = np.unique(self.omegas)
 
     def to_eigenbasis(self, op):
+        """Transforms vector or operator to energy eigenbasis."""
         if is_vector(op):
             return np.dot(dag(self.ek), op)[:self.nstates,:]
         elif is_matrix(op):
@@ -68,6 +72,7 @@ class Hamiltonian(object):
             raise AttributeError("Not a valid operator")
 
     def from_eigenbasis(self, op, trunc=True):
+        """Transforms vector or operator from energy eigenbasis."""
         if is_vector(op):
             return np.dot(self.ek, op)[:self.nstates,:]
         elif is_matrix(op):
@@ -172,8 +177,7 @@ class MDHamiltonian(Hamiltonian):
 
     # TODO this needs testing
     def compute_coordinate_surfaces(self, state):
-        """
-        NOTE: Currently only written for 2 modes (minimal conical intersection)
+        """NOTE: Currently only written for 2 modes (minimal conical intersection)
         probably need to extend with C++/Fortran for more dimensions or for parallelization
         """ 
         surfaces = []
