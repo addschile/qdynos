@@ -1,6 +1,6 @@
 from __future__ import print_function,absolute_import
 import numpy as np
-from .utils import dag,is_vector,is_matrix,norm
+from .utils import dag,is_vector,is_matrix,norm,matmult
 from .log import print_basic
 
 def add_results(results1, results2, weight=None):
@@ -119,15 +119,20 @@ class Results(object):
             for i,e_op in enumerate(self.e_ops):
                 if normalized:
                     nrm = norm(state)
-                else: norm = 1.0
-                self.expect[i,ind] = np.dot(state.conj().T, np.dot(e_op,state))[0,0].real/nrm
+                else: nrm = 1.0
+                self.expect[i,ind] = matmult(dag(state), e_op, state)[0,0].real/nrm
+                #try:
+                #    self.expect[i,ind] = matmult(dag(state), e_op, state)[0,0].real/nrm
+                #except:
+                #    self.expect[i,ind] = 0.0
                 if self.print_es:
                     self.fes.write('%.8f '%(self.expect[i,ind]))
         elif is_matrix(state):
             for i,e_op in enumerate(self.e_ops):
                 if normalized:
                     nrm = norm(state)
-                else: norm = 1.0
+                else: nrm = 1.0
+                # TODO sparsify
                 self.expect[i,ind] = np.trace( np.dot(e_op,state) ).real/nrm
                 if self.print_es:
                     self.fes.write('%.8f '%(self.expect[i,ind]))
