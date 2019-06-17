@@ -15,6 +15,10 @@ class Integrator(object):
         self.b = None
         if options.method == 'exact':
             self.integrate = self.exact_integrate
+        elif options.method == 'lanczos':
+            self.integrate = self.exact_integrate
+        elif options.method == 'arnoldi':
+            self.integrate = self.exact_integrate
         elif options.method == 'rk4':
             self.order = 4
             self.a = [1./6, 1./3. , 1./3. , 1./6.]
@@ -22,6 +26,7 @@ class Integrator(object):
             self.dt = dt
             self.integrate = self.rk4_integrate
             self.integrate_range = self.rk4_integrate_range
+        # TODO
         #elif options.method == 'adams':
         #    self.order = 4
         #    self.a = [1./6, 1./3. , 1./3. , 1./6.]
