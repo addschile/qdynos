@@ -8,10 +8,10 @@ import qdynos.constants as const
 
 from .integrator import Integrator
 from .dynamics import Dynamics
-from .utils import commutator,dag,to_liouville,from_liouville
+from .utils import commutator,dag,matmult,to_liouville,from_liouville
 from .options import Options
 from .results import Results
-from .log import *#print_method,print_stage,print_progress,print_time
+from .log import *
 
 class Redfield(Dynamics):
     """Dynamics class for Redfield-like dynamics. Can perform both 
@@ -23,9 +23,10 @@ class Redfield(Dynamics):
         """Instantiates the Redfield class.
         Parameters
         ----------
-        ham : Hamiltonian or MDHamiltonian class
+        ham : Hamiltonian
         time_dependent : bool
         is_secular : bool
+        options : Options class
         """
         super(Redfield, self).__init__(ham)
         self.ham = ham
@@ -62,6 +63,7 @@ class Redfield(Dynamics):
                 self.results.map_function = self.ham.compute_coordinate_surfaces
 
         self.ode = Integrator(self.dt, self.eom, self.options)
+        # TODO this is just stupid
         if self.options.method == "exact":
             if self.time_dep:
                 if self.is_secular and self.options.space == "hilbert":
@@ -265,39 +267,10 @@ class Redfield(Dynamics):
                         self.prop_n[i,i] = 0.0
                         self.prop_n[i,i] -= np.sum(self.prop_n[:,i])
                     self.Rdep_n -= self.Rdep_n*np.eye(nstates)
-                    # make propagators
-                    #self.prop = expm(self.dt*(self.prop_n-self.prop_n_1))
-                    #self.prop_n_1 = self.prop_n.copy()
-                    #self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + (self.Rdep_n-self.Rdep_n_1)/const.hbar**2.))
-                    #self.Rdep_n_1 = self.Rdep_n.copy()
                     self.prop = expm(self.prop_n-self.prop_n_1)
                     self.prop_n_1 = self.prop_n.copy()
                     self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + (self.Rdep_n-self.Rdep_n_1)/const.hbar**2./self.dt))
                     self.Rdep_n_1 = self.Rdep_n.copy()
-                    #### time integrate the rates ###
-                    #self.prop = np.zeros((nstates,nstates))
-                    #self.Rdep = np.zeros((nstates,nstates),dtype=complex)
-                    #for j in range(len(self.C)):
-                    #    # population transfer matrix
-                    #    gamma_diff = self.gamma_n[j][-1].real-self.gamma_n[j][0].real
-                    #    self.prop += 2.*np.einsum('ji,ij,ij->ij',self.C[j],self.C[j],gamma_diff.real)/const.hbar**2.
-                    #    # dephasing matrix
-                    #    self.Rdep += np.einsum('jj,ii,ii->ij',self.C[j],self.C[j],gamma_diff)
-                    #    self.Rdep += np.einsum('jj,ii,jj->ij',self.C[j],self.C[j],gamma_diff.conj().T)
-                    #    same_ik = np.einsum('im,mi,mi->i',self.C[j],self.C[j],gamma_diff)
-                    #    same_lj = np.einsum('im,mi,im->i',self.C[j],self.C[j],gamma_diff.conj().T)
-                    #    for i in range(nstates):
-                    #        self.Rdep[i,:] -= same_ik[i]
-                    #        self.Rdep[:,i] -= same_lj[i]
-                    #for i in range(nstates):
-                    #    self.prop[i,i] = 0.0
-                    #    self.prop[i,i] -= np.sum(self.prop[:,i])
-                    #self.Rdep -= self.Rdep*np.eye(nstates)
-                    ## make propagators
-                    ##self.prop = expm(self.dt*self.prop)
-                    ##self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + self.Rdep/const.hbar**2.))
-                    #self.prop = expm(self.prop)
-                    #self.Rdep = np.exp(self.dt*(-1.j*self.ham.omegas + self.Rdep/self.dt/const.hbar**2.))
                 else:
                     self.prop = list()
                     self.Rdep = list()
@@ -355,21 +328,21 @@ class Redfield(Dynamics):
         return self.equation_of_motion(state, order)
 
     def super_rf_eom(self, state, order):
-        return np.dot(self.prop , state)
+        return matmult(self.prop , state)
 
     def rf_eom(self, state, order):
         dy = (-1.j/const.hbar)*self.ham.commutator(state)
         for j in range(len(self.E)):
-            dy += (commutator(self.E[j]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j])))/const.hbar**2.
+            dy += (commutator(matmult(self.E[j],state),self.C[j]) + commutator(self.C[j],matmult(state,dag(self.E[j]))))/const.hbar**2.
         return dy
 
     def super_td_rf_eom(self, state, order):
-        return np.dot(self.prop[order] , state)
+        return matmult(self.prop[order], state)
 
     def td_rf_eom(self, state, order):
         dy = (-1.j/const.hbar)*self.ham.commutator(state)
         for j in range(len(self.E)):
-            dy += (commutator(self.E[j][order]@state,self.C[j]) + commutator(self.C[j],state@dag(self.E[j][order])))/const.hbar**2.
+            dy += (commutator(matmult(self.E[j][order],state),self.C[j]) + commutator(self.C[j],matmult(state,dag(self.E[j][order]))))/const.hbar**2.
         return dy
 
     def propagate_eom(self, rho, times):
@@ -427,7 +400,7 @@ class Redfield(Dynamics):
 
         return self.results
 
-    def solve(self, rho0, times, results=None):
+    def solve(self, rho0, times, eig=True, results=None):
         """Solve the Redfield equations of motion.
         Parameters
         ----------
@@ -440,6 +413,9 @@ class Redfield(Dynamics):
         results : Results class
         """
         self.setup(times, results)
+        # diagonalize hamiltonian
+        if eig:
+            self.ham.eigensystem()
 
         if self.options.verbose:
             print_stage("Initializing Coupling Operators")
