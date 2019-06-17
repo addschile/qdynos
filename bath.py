@@ -8,20 +8,18 @@ from numba import jit,double,complex128
 
 @jit(double(double, double, double),nopython=True)
 def bose(w, kT, hbar):
-    """
-    Fucntion for Bose-Einstein distribution.
-    """
+    """Fucntion for Bose-Einstein distribution."""
     return 1./np.expm1(w*hbar/kT)
 
 def switch(w, wstar):
-    """A smooth switching function for spectral density decompositions.
-    """
+    """A smooth switching function for spectral density decompositions."""
     if abs(w) < wstar:
         return (1. - (w/wstar)**2.)**2.
     else:
         return 0.0
 
 def _sample_modes(omega, kT, sample):
+    """Function that samples classical positions and momenta."""
     if sample=="Boltzmann":
         Q = np.random.normal(0.0, np.sqrt(kT)/omega)
         P = np.random.normal(0.0, np.sqrt(kT))
@@ -30,19 +28,18 @@ def _sample_modes(omega, kT, sample):
         Q = np.random.normal(0.0, np.sqrt(1/(2*omega*np.tanh(omega/(2*kT)))))
         P = np.random.normal(0.0, np.sqrt(omega/(2*np.tanh(omega/(2*kT)))))
         return Q , P
+# use numpy vectorization
 sample_modes = np.vectorize(_sample_modes)
 
 class Bath(object):
-    """
-    Base bath class.
+    """Base bath class.
 
     Methods
     -------
     """
 
     def real_bath_corr(self, w):
-        """
-        Real part of the bath correlation function.
+        """Real part of the bath correlation function.
         """
         if w==0:
             return self.J0*self.kT
@@ -59,13 +56,17 @@ class Bath(object):
         raise NotImplementedError
 
     def zero_T_bcf_t(self, t):
-        """
+        """Zero-temperatur bath correlation function, which can often be
+        analytically evaluated.
+
+        Notes
+        -----
+        \int_0^{\infty} d\omega J(\omega) [(2n(\omega)+1) \cos(\omega t) - i \sin(\omega t)]
         """
         raise NotImplementedError
 
     def spectral_density_function_at_0(self, w):
-        """Limit of the spectral density function at 0.
-        """
+        """Limit of the spectral density function at 0."""
         raise NotImplementedError
 
     def renormalization_integral(self):
@@ -86,9 +87,8 @@ class Bath(object):
         -----
         \int_0^{\infty} ds e^{i omega s} C(s)
         """
-        ppv = quad(self.real_bath_corr, 
-                             -self.omega_inf, self.omega_inf,
-                             limit=1000, weight='cauchy', wvar=omega)
+        ppv = quad(self.real_bath_corr, -self.omega_inf, self.omega_inf,
+                   limit=1000, weight='cauchy', wvar=omega)
         ppv = -ppv[0]
         return self.real_bath_corr(omega) + (1.j/np.pi)*ppv
 
@@ -96,11 +96,13 @@ class Bath(object):
         """Compute Fourier-Laplace integral of bath correlation function up to 
         some time t.
 
-        Uses inspiration from pyrho - https://github.com/berkelbach-group/pyrho
-
         Notes
         -----
-        \int_0^t ds e^{i omega s} C(s)
+        \int_0^t ds e^{i omega s} C(s),
+
+        where,
+
+        C(s) = \int_0^{\infty} d\omega J(\omega) [(2n(\omega)+1) \cos(\omega t) - i \sin(\omega t)]
         """
         def bath_corr_bose(w):
             if w==0:
@@ -110,15 +112,14 @@ class Bath(object):
         if self.kT == 0:
             return (1.0/np.pi)*self.zero_T_bcf_t(t)
         else:
-            #NOTE: don't integrate to infinity for numerical stability
+            # don't integrate to infinity for numerical stability
             re_Ct = quad(bath_corr_bose, 0.0, self.omega_inf, limit=1000, weight='cos', wvar=t)
             im_Ct = self.im_bath_corr_bose(t)
             re_Ct = re_Ct[0]
             return (1.0/np.pi)*(re_Ct - 1.j*im_Ct)
 
     def compute_omegas(self, nmodes):
-        """
-        """
+        """Discretizes spectral density given a certain number of modes."""
         raise NotImplementedError
 
     def frozen_mode_decomp(self, omega_star, PD=False):
@@ -147,6 +148,9 @@ class Bath(object):
         self.J_omega = self.Jfast
 
     def sample_modes(self, nmodes, sample):
+        """Discretizes spectral density given a certain number of modes and 
+        samples the classical positions and momenta.
+        """
         omegas, c_ns = self.compute_omegas(nmodes)
         Qs, Ps = sample_modes(omegas, self.kT, sample)
         return omegas , c_ns , Ps , Qs
@@ -176,7 +180,7 @@ class OhmicExp(Bath):
     J(\omega) = \eta \omega e^{- \omega / \omega_c}
     """
     def __init__(self, eta, wc, kT, op=None, disc='log'):
-        self.type = "ohmic exponential"
+        self.bath_type = "ohmic exponential"
         self.eta = eta
         self.wc = wc
         self.omega_inf = 50.*wc
@@ -236,7 +240,7 @@ class DebyeBath(Bath):
     J(\omega) = \eta \omega / (\omega^2 + \omega_c^2)
     """
     def __init__(self, eta, wc, kT, op=None, disc='log'):
-        self.type = "debye"
+        self.bath_type = "debye"
         self.eta = eta
         self.wc = wc
         self.omega_inf = 50.*wc
@@ -290,7 +294,7 @@ class MeierTannor(Bath):
     J(\omega) = \pi/2 \sum_k p_k w / ( ((w + wk)^2 + gamk^2) * ((w-wk)^2 + gamk^2) )
     """
     def __init__(self, pk, omk, gamk, kT, op=None):
-        self.type = "meier-tannor"
+        self.bath_type = "meier-tannor"
         self.pk = pk
         self.omk = omk
         self.gamk = gamk
@@ -348,7 +352,7 @@ class RubinBath(Bath):
     J(\omega) = 0.5 \omega \omega_R \sqrt{ 1- (\omega/\omega_R)^2}
     """
     def __init__(self, eta, wr, kT, op=None):
-        self.type = "rubin"
+        self.bath_type = "rubin"
         self.eta = eta
         self.wr = wr
         self.omega_inf = wr
@@ -381,7 +385,7 @@ class RubinBath(Bath):
 #    J(\omega) = \eta \omega e^{- \omega / \omega_c} / (\omega_c )
 #    """
 #    def __init__(self, eta, wc, kT, op=None):
-#        self.type = "super ohmic exponential"
+#        self.bath_type = "super ohmic exponential"
 #        self.eta = eta
 #        self.wc = wc
 #        self.omega_inf = 20.*wc
