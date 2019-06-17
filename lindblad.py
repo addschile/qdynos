@@ -1,19 +1,21 @@
 from __future__ import print_function,absolute_import
 
 import numpy as np
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
 from time import time
+from scipy.linalg import expm
+from copy import deepcopy
 
 import qdynos.constants as const
 
 from .integrator import Integrator
 from .dynamics import Dynamics
-from .utils import commutator,anticommutator,dag,norm,is_vector,is_matrix
+from .utils import commutator,anticommutator,dag,norm,matmult,is_vector,is_matrix
 from .options import Options
 from .results import Results,add_results,avg_results
+from .linalg import propagate,krylov_prop
 from .log import *
-
-from scipy.linalg import expm
-from copy import deepcopy
 
 class Lindblad(Dynamics):
     """
@@ -26,7 +28,7 @@ class Lindblad(Dynamics):
         self.ham = ham
         self.time_dep = time_dependent
 
-    def setup(self, gam, L, options, results):
+    def setup(self, gam, L, options, results, eig=False):
         """
         """
         # options setup
@@ -48,8 +50,6 @@ class Lindblad(Dynamics):
         if self.options.unraveling:
             if self.options.which_unraveling == 'jump':
                 print_method("Lindblad w/ Jumps")
-                self.options.method = 'exact'
-                #self.ode = Integrator(self.dt, self.eom_jump, self.options)
         else:
             print_method("Lindblad QME")
             self.ode = Integrator(self.dt, self.eom, self.options)
@@ -63,24 +63,43 @@ class Lindblad(Dynamics):
             self.gam_re = np.array([gam.real])
             self.gam_im = np.array([gam.imag])
             self.L = [L.copy()]
-        self.precompute_operators()
+        self.precompute_operators(eig)
 
-    def precompute_operators(self):
+    def precompute_operators(self, eig):
         """
         """
+        if eig:
+            self.ham.eigensystem()
         nstates = self.ham.nstates
-        lamb = np.zeros((nstates,nstates),dtype=complex)
+        if self.options.method == 'arnoldi':
+            lamb = sp.lil_matrix((nstates,nstates))
+            eig = False
+            # check if relevant matrices are csr matrices #
+            # ham
+            if not isinstance(self.ham.ham, sp.csr_matrix):
+                self.ham.ham = sp.csr_matrix(self.ham.ham)
+            # expectation operators
+            if self.results.e_ops != None:
+                for i in range(len(self.results.e_ops)):
+                    if not isinstance(self.results.e_ops[i], sp.csr_matrix):
+                        self.results.e_ops[i] = sp.csr_matrix(self.results.e_ops[i])
+        else:
+            lamb = np.zeros((nstates,nstates),dtype=complex)
         self.LdL = []
         for i in range(len(self.L)):
             # transform lindblad operators into eigenbasis
-            self.L[i] = self.ham.to_eigenbasis(self.L[i])
+            if eig:
+                self.L[i] = self.ham.to_eigenbasis(self.L[i])
             # make list of L^\dagger L for faster computations
-            self.LdL.append( np.dot(dag(self.L[i]),self.L[i]) )
+            self.LdL.append( matmult(dag(self.L[i]),self.L[i]) )
             self.L[i] *= np.sqrt(self.gam_re[i])
             # compute lamb 
             lamb += self.gam_im[i]*self.LdL[i]
             self.LdL[i] *= self.gam_re[i]
-        self.A = self.ham.Heig + lamb
+        if eig:
+            self.A = self.ham.Heig + lamb
+        else:
+            self.A = self.ham.ham + sp.csr_matrix(lamb)
 
         if self.options.unraveling:
             # add non-hermitian term
@@ -88,6 +107,14 @@ class Lindblad(Dynamics):
                 self.A -= 0.5j*self.LdL[i]
 
         self.A *= -1.j/const.hbar
+
+    def make_propagator(self, dt):
+        if self.options.method == 'exact':
+            self.expmA = expm(self.A*dt)
+        elif self.options.method == 'arnoldi':
+            if self.just_jumped:
+                # change timestep used for propagation
+                self.w *= (dt/self.dt)
 
     # TODO make time-dependent version
     #def eom_td(self, state, order):
@@ -119,19 +146,40 @@ class Lindblad(Dynamics):
     
         assert(count<len(self.L))
 
+    def eom_jump_arnoldi(self, state, order):
+        """
+        """
+        # TODO wtf was I doing here??????
+        if not self.just_jumped:
+            state , self.T , self.V = krylov_prop(self.A, self.options.nlanczos, state, self.dt, self.options.method, return_all=True)
+        else:
+            return propagate(self.V, self.T, ):
+            
+        return state
+            # update krylov subspace
+            self.w,self.v = spla.eigsh(self.A, k=self.options.nlanczos, which='SA', v0=state.toarray())
+            self.w*self.dt
+            self.v = sp.csr_matrix(self.v)
+        w = np.exp(self.w)
+        w = sp.csr_matrix(np.diag(w))
+        return matmult(self.v,w,dag(self.v), state)
+
     def eom_jump(self, state, order):
-        return np.dot(self.expmA, state)
+        """
+        """
+        return matmult(self.expmA, state)
 
     def eom(self, state, order):
-        #drho = (-1.j/const.hbar)*self.ham.commutator(state)
-        #drho = (-1.j/const.hbar)*commutator(self.A,state)
+        """
+        """
         drho = commutator(self.A,state)
         for i in range(len(self.L)):
-            #drho += self.gam_re[i]*(np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
             drho += (np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
         return drho
 
     def integrate_trajectories(self, psi0, times, ntraj):
+        """
+        """
 
         if self.options.seed==None:
             seeder = int(time())
@@ -140,8 +188,10 @@ class Lindblad(Dynamics):
             seeder = self.options.seed + int(time())
             np.random.seed( seeder )
             
-        # initialize integrator class
-        self.expmA = expm(self.A*self.dt)
+        # make initial propagator
+        self.just_jumped = 0
+        self.make_propagator(self.dt)
+        times = np.append(times,times[-1]+self.dt)
     
         btime = time()
         for i in range(ntraj):
@@ -161,7 +211,10 @@ class Lindblad(Dynamics):
             rand = np.random.uniform()
     
             # set initial value of the integrator
-            self.ode = Integrator(self.dt, self.eom_jump, self.options)
+            if self.options.method == 'exact':
+                self.ode = Integrator(self.dt, self.eom_jump, self.options)
+            elif self.options.method == 'lanczos' or self.options.method == 'arnoldi' :
+                self.ode = Integrator(self.dt, self.eom_arnoldi, self.options)
             self.ode._set_y_value(psi0.copy(), t)
             psi_track = psi0.copy()
     
@@ -169,86 +222,91 @@ class Lindblad(Dynamics):
             results_traj = deepcopy(self.results)
     
             count = 0
-            while self.ode.t <= times[-1]:
-    
-                # do stuff for results
+            for j in range(len(times)-1):
+
+                # for each time do results stuff
                 results_traj.analyze_state(count, self.ode.t, psi_track)
                 count += 1
-    
-                # data before integrating
-                t_prev = self.ode.t
-                psi_prev = self.ode.y.copy()
-                norm_prev = norm(self.ode.y)
-    
-                # integrate without renormalization
-                self.ode.integrate()
-    
-                # data after integrating
-                norm_psi = norm(self.ode.y)
-                t_next = self.ode.t
-    
-                if norm_psi <= rand:
-    
-                    # quantum jump has happened
-                    njumps += 1
-    
-                    ii = 0
-                    t_final = t_next
-    
-                    while ii < self.options.norm_steps:
-    
-                        ii += 1
-    
-                        # make a guess for when the jump occurs
-                        t_guess = t_prev + np.log(norm_prev / rand) / \
-                            np.log(norm_prev / norm_psi)*(t_final-t_prev) 
-    
-                        self.expmA = expm(self.A*(t_guess-t_prev))
-    
-                        # integrate psi from t_prev to t_guess
-                        norm_prev = norm(psi_prev)
-                        self.ode.y = psi_prev.copy()
-                        self.ode.integrate(change_dt=0)
-                        norm_guess = norm(self.ode.y)
-    
-                        # determine what to do next
-                        if (np.abs(norm_guess - rand) <= (self.options.norm_tol*rand)):
-                            # t_guess was right!
-                            t = t_guess
-    
-                            # jump
-                            self.ode.y /= np.sqrt(norm_guess)
-                            rand = np.random.uniform()
-                            self.ode.y , ind = self.jump(rand, self.ode.y)
-                            jumps.append( [t,ind] )
 
-                            # integrate up to t_next
-                            self.expmA = expm(self.A*(t_next-t))
-                            self.ode.integrate(renorm=1, change_dt=0)
+                self.just_jumped = 0
+                while self.ode.t != times[j+1]:
+    
+                    # data before integrating
+                    t_prev = self.ode.t
+                    psi_prev = self.ode.y.copy()
+                    norm_prev = norm(self.ode.y)
+    
+                    # integrate without renormalization
+                    self.ode.integrate(change_dt=0)
+    
+                    # data after integrating
+                    norm_psi = norm(self.ode.y)
+                    t_next = times[j+1]
+    
+                    if norm_psi <= rand:
+                        self.just_jumped = 1
+    
+                        # quantum jump has happened
+                        njumps += 1
+    
+                        ii = 0
+                        t_final = t_next
+    
+                        while ii < self.options.jump_time_steps:
+    
+                            ii += 1
+    
+                            # make a guess for when the jump occurs
+                            t_guess = t_prev + np.log(norm_prev / rand) / \
+                                np.log(norm_prev / norm_psi)*(t_final-t_prev) 
+    
+                            # make propagator up to t_guess
+                            self.make_propagator(t_guess-t_prev)
+    
+                            # integrate psi from t_prev to t_guess
+                            norm_prev = norm(psi_prev)
+                            self.ode.y = psi_prev.copy()
+                            self.ode.integrate(change_dt=0)
+                            norm_guess = norm(self.ode.y)
+    
+                            # determine what to do next
+                            if (np.abs(norm_guess - rand) <= (self.options.jump_time_tol*rand)):
+                                # t_guess was right!
+                                self.ode.t = t_guess
+    
+                                # jump
+                                self.ode.y /= np.sqrt(norm_guess)
+                                rand = np.random.uniform()
+                                self.ode.y , ind = self.jump(rand, self.ode.y)
+                                jumps.append( [t,ind] )
 
-                            # choose a new random number for next jump
-                            rand = np.random.uniform()
+                                # make propagator up to t_next
+                                self.make_propagator(t_next-t_guess)
 
-                            # unitary trasnformation 
-                            psi_track = self.ode.y.copy()
+                                # choose a new random number for next jump
+                                rand = np.random.uniform()
+                                break
+                            elif (norm_guess < rand):
+                                # t_guess > t_jump
+                                t_final = t_guess
+                                norm_psi = norm_guess
+                            else:
+                                # t_guess < t_jump
+                                t_prev = t_guess
+                                psi_prev = self.ode.y.copy()
+                                norm_prev = norm_guess
+                            if ii == self.options.jump_time_steps:
+                                raise ValueError("Couldn't find jump time")
+                    else:
+                        # no jump update time
+                        self.ode.t = times[j+1]
+                        if self.just_jumped:
+                            self.make_propagator(self.dt)
+                            self.just_jumped = 0
 
-                            break
-                        elif (norm_guess < rand):
-                            # t_guess > t_jump
-                            t_final = t_guess
-                            norm_psi = norm_guess
-                        else:
-                            # t_guess < t_jump
-                            t_prev = t_guess
-                            psi_prev = self.ode.y.copy()
-                            norm_prev = norm_guess
-                        if ii == self.options.norm_steps:
-                            raise ValueError("Couldn't find jump time")
-                else:
-                    # no jump occurred
-                    psi_track = self.ode.y.copy()
-                    # renormalize the tracking wavefunction
-                    psi_track /= np.sqrt(norm(psi_track))
+                # store new normalized wavefunction for this timestep
+                psi_track = self.ode.y.copy()
+                psi_track /= np.sqrt(norm(psi_track))
 
             if self.results.jump_stats:
                 results_traj.store_jumps(njumps, jumps)
@@ -256,28 +314,31 @@ class Lindblad(Dynamics):
 
         return avg_results(ntraj, self.results)
 
-    def solve(self, rho0, times, gam, L, ntraj=1000, options=None, results=None):
+    def solve(self, rho0, times, gam, L, ntraj=1000, eig=False, options=None, results=None):
         """
         """
         self.dt = times[1]-times[0]
         self.tobs = len(times)
-        self.setup(gam, L, options, results)
-        if self.results.e_ops != None:
-            for i in range(len(self.results.e_ops)):
-                self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
+        self.setup(gam, L, options, results, eig=eig)
+        if eig:
+            if self.results.e_ops != None:
+                for i in range(len(self.results.e_ops)):
+                    self.results.e_ops[i] = self.ham.to_eigenbasis(self.results.e_ops[i])
+            rho0 = self.ham.to_eigenbasis(rho0)
 
         if self.options.unraveling:
             if is_vector(rho0):
-                psi0 = self.ham.to_eigenbasis(rho0.copy())
+                psi0 = rho0.copy()
             else:
                 raise AttributeError("Initial condition must be a wavefunction")
             return self.integrate_trajectories(psi0, times, ntraj)
         else:
             if is_matrix(rho0):
-                rho = self.ham.to_eigenbasis(rho0.copy())
+                rho = rho0.copy()
                 self.ode._set_y_value(rho, times[0])
             else:
-                raise AttributeError("Initial condition must be a density matrix")
+                print_warning("Converting wavefunction to density matrix.")
+                rho = matmult(rho0,dag(rho0))
             btime = time()
             for i,tau in enumerate(times):
                 if self.options.progress:
@@ -288,3 +349,30 @@ class Lindblad(Dynamics):
                     self.results.analyze_state(i, tau, self.ode.y)
                 self.ode.integrate()
             return self.results
+
+# TODO
+#def make_lindblad_ops(ham):
+#    """
+#    """
+#    nstates = ham.nstates
+#    for k,bath in enumerate(ham.baths):
+#        Ga = ham.to_eigenbasis( bath.c_op )
+#        theta_zero = bath.ft_bath_corr(0.0)
+#        theta_plus = theta_zero*np.identity(nstates,dtype=complex)
+#        for i in range(nstates):
+#            for j in range(nstates):
+#                if i!=j:
+#                    theta_plus[i,j] = bath.ft_bath_corr(-ham.omegas[i,j])
+#        if self.options.print_coup_ops:
+#            np.save(self.options.coup_ops_file+"c_op_%d"%(k),Ga)
+#            np.save(self.options.coup_ops_file+"theta_plus_%d"%(k),theta_plus)
+#        # population transfer matrix
+#        prop += 2.*np.einsum('ji,ij,ij->ij',Ga,Ga,theta_plus.real)/const.hbar**2.
+#        # dephasing matrix
+#        self.Rdep += np.einsum('jj,ii,ii->ij',Ga,Ga,theta_plus)
+#        self.Rdep += np.einsum('jj,ii,jj->ij',Ga,Ga,theta_plus.conj().T)
+#        same_ik = np.einsum('im,mi,mi->i',Ga,Ga,theta_plus)
+#        same_lj = np.einsum('im,mi,im->i',Ga,Ga,theta_plus.conj().T)
+#        for i in range(nstates):
+#            self.Rdep[i,:] -= same_ik[i]
+#            self.Rdep[:,i] -= same_lj[i]
