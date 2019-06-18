@@ -13,6 +13,36 @@ def kron(*mats):
         out = sp.kron(out,mat)
     return out
 
+def phi(n1,n2=None,nel=None):
+    if nel==None:
+        phiout = sp.lil_matrix((2,2))
+    else:
+        phiout = sp.lil_matrix((nel,nel))
+    if n2==None:
+        phiout[n1,n1] = 1.
+    else:
+        phiout[n1,n2] = 1.
+    return phiout
+
+def eye(n, sparse=False):
+    return sp.eye(n, format='lil')
+
+def make_ho_q(n):
+    qout = sp.lil_matrix((n,n))
+    for i in range(n-1):
+        qout[i,i+1] = np.sqrt(float(i+1)*0.5)
+        qout[i+1,i] = np.sqrt(float(i+1)*0.5)
+    return qout
+
+def make_ho_h(n,omega,kappa=0.0,q=None):
+    hout = np.diag(np.array([omega*(float(i)+0.5) for i in range(n)]))
+    hout = sp.lil_matrix(hout)
+    if kappa != 0.0:
+        if not q is None:
+            q = make_ho_q(n)
+        hout += kappa*q
+    return hout
+
 def construct_ops():
 
     # number of states per mode
@@ -21,13 +51,13 @@ def construct_ops():
     nsite = 2*nphi*nc
 
     # relevant stuff
-    eye_e   = sp.eye(2,format='lil')
-    eye_c   = sp.eye(nc,format='lil')
-    eye_phi = sp.eye(nphi,format='lil')
-    phi0    = sp.lil_matrix(np.array([[1.,0.],[0.,0.]]))
-    phi1    = sp.lil_matrix(np.array([[0.,0.],[0.,1.]]))
-    phi01   = sp.lil_matrix(np.array([[0.,1.],[0.,0.]]))
-    phi10   = sp.lil_matrix(np.array([[0.,0.],[1.,0.]]))
+    eye_e   = eye(2)
+    eye_c   = eye(nc)
+    eye_phi = eye(nphi)
+    phi0    = phi(0)
+    phi1    = phi(1)
+    phi01   = phi(0,1)
+    phi10   = phi(1,0)
 
     # coupling mode parameters
     sys.stdout.write('Making coupling mode hamiltonian\n')
@@ -35,15 +65,9 @@ def construct_ops():
     omega  = 0.19
     kappa0 = 0.0
     kappa1 = 0.095
-    qc = sp.lil_matrix((nc,nc),dtype=complex)
-    for i in range(nc-1):
-        qc[i,i+1] = np.sqrt(float(i+1)/2.)
-        qc[i+1,i] = np.sqrt(float(i+1)/2.)
-    hc = sp.lil_matrix((nc,nc),dtype=complex)
-    for i in range(nc):
-        hc[i,i] = omega*(float(i)+0.5)
-    hc0 = hc + kappa0*qc
-    hc1 = hc + kappa1*qc
+    qc = make_ho_q(nc)
+    hc0 = make_ho_h(nc, omega, kappa=kappa0, q=qc)
+    hc1 = make_ho_h(nc, omega, kappa=kappa1, q=qc)
 
     # rotor mode parameters
     sys.stdout.write('Making rotor mode hamiltonian\n')
@@ -61,12 +85,9 @@ def construct_ops():
     for i in range(nphi-1):
         cosphi[i,i+1] = 0.5
         cosphi[i+1,i] = 0.5
-
     tphi = sp.lil_matrix((nphi,nphi))
     for i in range(-nm,nm+1):
         tphi[i+nm,i+nm] = -float(i)**2.
-
-    qphi = eye_phi-cosphi
     V0 = E0*eye_phi + 0.5*W0*(eye_phi-cosphi)
     V1 = E1*eye_phi - 0.5*W1*(eye_phi-cosphi)
     hphi0 = -0.5*minv*tphi + V0
@@ -83,6 +104,7 @@ def construct_ops():
     # electronic coupling
     H += lamda*kron(phi01, eye_phi, qc)
     H += lamda*kron(phi10, eye_phi, qc)
+    # convert to csr matrix
     H = sp.csr_matrix(H)
 
     sys.stdout.write('Making projection operators\n')
@@ -98,17 +120,24 @@ def construct_ops():
                 ptrans[i+nm,j+nm] = 0.5
     pcis = eye_phi-ptrans
 
+    # full Ptrans and Pcis
     Ptrans = kron(eye_e, ptrans, eye_c)
     Pcis   = kron(eye_e, pcis, eye_c)
+    # diabatic projectors
     p0 = kron(phi0, eye_phi, eye_c)
     p1 = kron(phi1, eye_phi, eye_c)
+    # diabatic projected Ptrans
     Ptrans0 = Ptrans.dot(p0)
-    Ptrans0 = sp.csr_matrix(Ptrans0)
     Ptrans1 = Ptrans.dot(p1)
-    Ptrans1 = sp.csr_matrix(Ptrans1)
+    # diabatic projected Pcis
     Pcis0 = Pcis.dot(p0)
-    Pcis0 = sp.csr_matrix(Pcis0)
     Pcis1 = Pcis.dot(p1)
+    # convert to csr matrix
+    p0 = sp.csr_matrix(p0)
+    p1 = sp.csr_matrix(p1)
+    Ptrans0 = sp.csr_matrix(Ptrans0)
+    Ptrans1 = sp.csr_matrix(Ptrans1)
+    Pcis0 = sp.csr_matrix(Pcis0)
     Pcis1 = sp.csr_matrix(Pcis1)
 
     #sys.stdout.write('Making system-bath coupling operators\n')
@@ -128,24 +157,29 @@ def construct_ops():
     sys.stdout.write('Creating initial condition\n')
     sys.stdout.flush()
     # cis excitation
+    # e
     psie = sp.lil_matrix((2,1),dtype=complex)
     psie[1,0] = 1.
+    # phi
     psiphi = sp.lil_matrix((nphi,1),dtype=complex)
     psiphi[0,0] = 1.
+    # c
     psic = sp.lil_matrix((nc,1),dtype=complex)
     psic[0,0] = 1.
+    # full psi
     psi0 = kron(psie,psiphi,psic)
+    # conver to csr
     psi0 = sp.csr_matrix(psi0)
 
-    return psi0, H, Ptrans0, Ptrans1, Pcis0, Pcis1
+    return psi0, H, p0, p1, Ptrans0, Ptrans1, Pcis0, Pcis1
 
 if __name__ == '__main__':
 
     # construct operators
-    psi0,H,pt0,pt1,pc0,pc1 = construct_ops()
+    psi0,H,p0,p1,pt0,pt1,pc0,pc1 = construct_ops()
 
     # set up qdynos and run
     times = np.arange(0.0,4000.,1.0)
     ham = Hamiltonian(H, units='ev')
     dynamics = UnitaryWF(ham)
-    output = dynamics.solve(psi0, times, options=Options(method='lanczos'), results=Results(tobs=len(times), e_ops=[pt0,pt1,pc0,pc1], print_es=True, es_file='rhodopsin.txt'))
+    output = dynamics.solve(psi0, times, options=Options(method='lanczos'), results=Results(tobs=len(times), e_ops=[p0,p1,pt0,pt1,pc0,pc1], print_es=True, es_file='rhodopsin.txt'))
