@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/Users/addisonschile/Software')
+sys.path.append('/Users/addison/Software')
 import numpy as np
 import matplotlib.pyplot as plt
 from qdynos.hamiltonian import Hamiltonian

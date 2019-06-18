@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-sys.path.append('/Users/addisonschile/Software/')
+sys.path.append('/Users/addison/Software/')
 from qdynos.hamiltonian import Hamiltonian
 from qdynos.results import Results
 from qdynos.options import Options
@@ -107,10 +107,11 @@ def main(argv):
         p1[i,i] = 1.
         p2[int(nsite/2)+i,int(nsite/2)+i] = 1.
 
-    ham = Hamiltonian(H, nstates=500, hbar=hbar)
+    ham = Hamiltonian(H, units='ev')
     dynamics = Lindblad(ham)
     results = Results(tobs=tobs,e_ops=[p1,p2])
-    options = Options(method='arnoldi', unraveling=True)
+    #options = Options(method='arnoldi', nlanczos=50, unraveling=True, jump_time_finder='bisection')
+    options = Options(method='arnoldi', unraveling=True, jump_time_finder='bisection', jump_time_steps=20)
     output = dynamics.solve(psi_0, times, np.array([0.1,0.1]), [qt,qc], ntraj=1, options=options, results=results)
     output.print_expectation(es_file='db_pops_lindblad_jumps_arnoldi.dat')
 
