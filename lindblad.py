@@ -156,7 +156,6 @@ class Lindblad(Dynamics):
         """
         """
         if self.jumping:
-            print('propagating',self.dt_jump)
             # searching for jump time, so only need to propagate with different dt
             return propagate(self.V, self.T, self.dt_jump)
         elif self.just_jumped:
@@ -190,7 +189,7 @@ class Lindblad(Dynamics):
             seeder = int(time())
             np.random.seed( seeder )
         else:
-            seeder = self.options.seed + int(time())
+            seeder = self.options.seed
             np.random.seed( seeder )
             
         # make initial propagator
@@ -249,12 +248,9 @@ class Lindblad(Dynamics):
     
                     # data after integrating
                     norm_psi = norm(self.ode.y)
-                    #print(norm_psi,rand)
                     t_next = times[j+1]
     
-                    print(norm_psi,rand)
                     if norm_psi <= rand:
-                        print('jumping')
                         self.just_jumped = 1
                         self.jumping = 1
     
@@ -271,7 +267,6 @@ class Lindblad(Dynamics):
                             # make a guess for when the jump occurs
                             if self.options.method == 'arnoldi' or self.options.method == 'lanczos':
                                 t_guess = t_prev + 0.5*(t_final-t_prev)
-                                print(self.ode.t, t_prev, t_final, t_guess)
                                 # make propagator up to t_guess
                                 self.make_propagator(t_guess-self.ode.t)
                             else:
@@ -286,10 +281,8 @@ class Lindblad(Dynamics):
                             self.ode.integrate(change_dt=0)
                             norm_guess = norm(self.ode.y)
     
-                            print(norm_guess, rand)
                             # determine what to do next
                             if (np.abs(norm_guess - rand) <= (self.options.jump_time_tol*rand)):
-                                print('jumped')
                                 # t_guess was right!
                                 self.ode.t = t_guess
     
@@ -299,11 +292,11 @@ class Lindblad(Dynamics):
                                 self.ode.y , ind = self.jump(rand, self.ode.y)
                                 jumps.append( [t,ind] )
 
-                                # need to reform krylov subspace
-                                self.jumping = 0
-
                                 # make propagator up to t_next
                                 self.make_propagator(t_next-t_guess)
+
+                                # need to reform krylov subspace
+                                self.jumping = 0
 
                                 # choose a new random number for next jump
                                 rand = np.random.uniform()
