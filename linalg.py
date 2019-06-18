@@ -146,12 +146,12 @@ def lanczos_lowmem(A, nvecs, v0, dt):
     return psiout
 
 ################################################################################
-# Functionso that use krylov subspace methods for oring all the vectors        #
+# Functions that use krylov subspace methods for oring all the vectors         #
 ################################################################################
 def propagate(V, T, dt):
     """
     """
-    nvecs = T.shape[0]
+    nvecs = len(V)
     psiprop = expm(-1.j*dt*T/const.hbar)[:,0]
     for i in range(nvecs):
         if i==0:
