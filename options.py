@@ -10,9 +10,10 @@ class Options(object):
                  lanczos_lowmem=False, print_coup_ops=False, coup_ops_file=None, 
                  print_decomp=False, decomp_file=None, ham_file=None, ntraj=1000, 
                  traj_results=False, traj_results_file=None, traj_states=False, 
-                 traj_states_file=None,traj_states_every=1, block_avg=False, nblocks=10, 
-                 jump_time_steps=1000, jump_time_tol=1.e-3, seed=None, markov_time=np.inf, 
-                 unraveling=False, which_unraveling='jump', restart_file=None, restart=False):
+                 traj_states_file=None,traj_states_every=1, block_avg=False, nblocks=10,
+                 jump_time_steps=1000, jump_time_tol=1.e-3, seed=None, 
+                 markov_time=np.inf, unraveling=False, which_unraveling='jump', 
+                 restart_file=None, restart=False):
 
         # program run options #
         self.verbose = verbose
