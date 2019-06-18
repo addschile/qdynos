@@ -11,7 +11,7 @@ import qdynos.constants as const
 
 from .integrator import Integrator
 from .dynamics import Dynamics
-from .utils import commutator,anticommutator,dag,norm,matmult,is_vector,is_matrix
+from .utils import dag,commutator,anticommutator,inner,matmult,norm,is_vector,is_matrix
 from .options import Options
 from .results import Results,add_results,avg_results
 from .linalg import propagate,krylov_prop
@@ -68,11 +68,9 @@ class Lindblad(Dynamics):
     def precompute_operators(self, eig):
         """
         """
-        if eig:
-            self.ham.eigensystem()
         nstates = self.ham.nstates
         if self.options.method == 'arnoldi':
-            lamb = sp.lil_matrix((nstates,nstates))
+            lamb = sp.csr_matrix((nstates,nstates))
             eig = False
             # check if relevant matrices are csr matrices #
             # ham
@@ -85,11 +83,16 @@ class Lindblad(Dynamics):
                         self.results.e_ops[i] = sp.csr_matrix(self.results.e_ops[i])
         else:
             lamb = np.zeros((nstates,nstates),dtype=complex)
+        if eig:
+            self.ham.eigensystem()
         self.LdL = []
         for i in range(len(self.L)):
             # transform lindblad operators into eigenbasis
             if eig:
                 self.L[i] = self.ham.to_eigenbasis(self.L[i])
+            if self.options.method == 'arnoldi':
+                if not isinstance(self.L[i], sp.csr_matrix):
+                    self.L[i] = sp.csr_matrix(self.L[i])
             # make list of L^\dagger L for faster computations
             self.LdL.append( matmult(dag(self.L[i]),self.L[i]) )
             self.L[i] *= np.sqrt(self.gam_re[i])
@@ -99,22 +102,22 @@ class Lindblad(Dynamics):
         if eig:
             self.A = self.ham.Heig + lamb
         else:
-            self.A = self.ham.ham + sp.csr_matrix(lamb)
+            self.A = self.ham.ham + lamb
 
         if self.options.unraveling:
             # add non-hermitian term
             for i in range(len(self.L)):
                 self.A -= 0.5j*self.LdL[i]
 
-        self.A *= -1.j/const.hbar
+        if not (self.options.method == 'arnoldi' or self.options.method == 'lanczos'):
+            self.A *= -1.j/const.hbar
 
     def make_propagator(self, dt):
         if self.options.method == 'exact':
             self.expmA = expm(self.A*dt)
         elif self.options.method == 'arnoldi':
-            if self.just_jumped:
-                # change timestep used for propagation
-                self.w *= (dt/self.dt)
+            if self.jumping:
+                self.dt_jump = dt
 
     # TODO make time-dependent version
     #def eom_td(self, state, order):
@@ -127,7 +130,7 @@ class Lindblad(Dynamics):
     def jump_probs(self, psi):
         p_n = np.zeros(len(self.L))
         for i in range(len(self.LdL)):
-            p_n[i] = np.dot(dag(psi), np.dot(self.LdL[i], psi))[0,0].real
+            p_n[i] = inner(psi, matmult(self.LdL[i], psi)).real
         p = np.sum(p_n)
         return p_n , p
 
@@ -137,11 +140,14 @@ class Lindblad(Dynamics):
         p_n , p = self.jump_probs(psi)
     
         # see which one it jumped along
-        psi_out = np.zeros_like(psi)
+        if isinstance(psi, np.ndarray):
+            psi_out = np.zeros_like(psi)
+        else:
+            psi_out = sp.csr_matrix(psi.shape, dtype=complex)
         p *= rand
         for count in range(len(self.L)):
             if p <= np.sum(p_n[:count+1]):
-                psi_out = np.dot(self.L[count], psi)
+                psi_out = matmult(self.L[count], psi)
                 return psi_out/np.sqrt(p_n[count]) , count
     
         assert(count<len(self.L))
@@ -149,20 +155,19 @@ class Lindblad(Dynamics):
     def eom_jump_arnoldi(self, state, order):
         """
         """
-        # TODO wtf was I doing here??????
-        if not self.just_jumped:
-            state , self.T , self.V = krylov_prop(self.A, self.options.nlanczos, state, self.dt, self.options.method, return_all=True)
+        if self.jumping:
+            print('propagating',self.dt_jump)
+            # searching for jump time, so only need to propagate with different dt
+            return propagate(self.V, self.T, self.dt_jump)
+        elif self.just_jumped:
+            # just jumped so need to reform the krylov subspace
+            # TODO do I need to return all the stuff
+            state , self.T , self.V = krylov_prop(self.A, self.options.nlanczos, state, self.dt_jump, self.options.method, return_all=True)
+            return state
         else:
-            return propagate(self.V, self.T, ):
-            
-        return state
-            # update krylov subspace
-            self.w,self.v = spla.eigsh(self.A, k=self.options.nlanczos, which='SA', v0=state.toarray())
-            self.w*self.dt
-            self.v = sp.csr_matrix(self.v)
-        w = np.exp(self.w)
-        w = sp.csr_matrix(np.diag(w))
-        return matmult(self.v,w,dag(self.v), state)
+            # routine propagation
+            state , self.T , self.V = krylov_prop(self.A, self.options.nlanczos, state, self.dt, self.options.method, return_all=True)
+            return state
 
     def eom_jump(self, state, order):
         """
@@ -190,6 +195,7 @@ class Lindblad(Dynamics):
             
         # make initial propagator
         self.just_jumped = 0
+        self.jumping = 0
         self.make_propagator(self.dt)
         times = np.append(times,times[-1]+self.dt)
     
@@ -214,7 +220,9 @@ class Lindblad(Dynamics):
             if self.options.method == 'exact':
                 self.ode = Integrator(self.dt, self.eom_jump, self.options)
             elif self.options.method == 'lanczos' or self.options.method == 'arnoldi' :
-                self.ode = Integrator(self.dt, self.eom_arnoldi, self.options)
+                self.ode = Integrator(self.dt, self.eom_jump_arnoldi, self.options)
+                if isinstance(psi0, np.ndarray):
+                    psi0 = sp.csr_matrix(psi0)
             self.ode._set_y_value(psi0.copy(), t)
             psi_track = psi0.copy()
     
@@ -241,10 +249,14 @@ class Lindblad(Dynamics):
     
                     # data after integrating
                     norm_psi = norm(self.ode.y)
+                    #print(norm_psi,rand)
                     t_next = times[j+1]
     
+                    print(norm_psi,rand)
                     if norm_psi <= rand:
+                        print('jumping')
                         self.just_jumped = 1
+                        self.jumping = 1
     
                         # quantum jump has happened
                         njumps += 1
@@ -257,11 +269,16 @@ class Lindblad(Dynamics):
                             ii += 1
     
                             # make a guess for when the jump occurs
-                            t_guess = t_prev + np.log(norm_prev / rand) / \
-                                np.log(norm_prev / norm_psi)*(t_final-t_prev) 
-    
-                            # make propagator up to t_guess
-                            self.make_propagator(t_guess-t_prev)
+                            if self.options.method == 'arnoldi' or self.options.method == 'lanczos':
+                                t_guess = t_prev + 0.5*(t_final-t_prev)
+                                print(self.ode.t, t_prev, t_final, t_guess)
+                                # make propagator up to t_guess
+                                self.make_propagator(t_guess-self.ode.t)
+                            else:
+                                t_guess = t_prev + np.log(norm_prev / rand) / \
+                                    np.log(norm_prev / norm_psi)*(t_final-t_prev) 
+                                # make propagator up to t_guess
+                                self.make_propagator(t_guess-t_prev)
     
                             # integrate psi from t_prev to t_guess
                             norm_prev = norm(psi_prev)
@@ -269,8 +286,10 @@ class Lindblad(Dynamics):
                             self.ode.integrate(change_dt=0)
                             norm_guess = norm(self.ode.y)
     
+                            print(norm_guess, rand)
                             # determine what to do next
                             if (np.abs(norm_guess - rand) <= (self.options.jump_time_tol*rand)):
+                                print('jumped')
                                 # t_guess was right!
                                 self.ode.t = t_guess
     
@@ -279,6 +298,9 @@ class Lindblad(Dynamics):
                                 rand = np.random.uniform()
                                 self.ode.y , ind = self.jump(rand, self.ode.y)
                                 jumps.append( [t,ind] )
+
+                                # need to reform krylov subspace
+                                self.jumping = 0
 
                                 # make propagator up to t_next
                                 self.make_propagator(t_next-t_guess)
