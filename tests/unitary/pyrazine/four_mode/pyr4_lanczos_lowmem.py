@@ -2,7 +2,7 @@ import numpy as np
 import scipy.sparse as sp
 
 import sys
-sys.path.append('/Users/addisonschile/Software/')
+sys.path.append('/Users/addison/Software/')
 from qdynos.hamiltonian import Hamiltonian
 from qdynos.unitary import UnitaryWF
 from qdynos.results import Results
