@@ -1,6 +1,6 @@
 from __future__ import print_function,absolute_import
 import numpy as np
-from .utils import dag,is_vector,is_matrix,norm,matmult
+from .utils import dag,inner,is_vector,is_matrix,norm,matmult
 from .log import print_basic
 
 def add_results(results1, results2, weight=None):
@@ -120,7 +120,7 @@ class Results(object):
                 if normalized:
                     nrm = norm(state)
                 else: nrm = 1.0
-                self.expect[i,ind] = matmult(dag(state), e_op, state)[0,0].real/nrm
+                self.expect[i,ind] = inner(state, matmult(e_op, state)).real/nrm
                 #try:
                 #    self.expect[i,ind] = matmult(dag(state), e_op, state)[0,0].real/nrm
                 #except:

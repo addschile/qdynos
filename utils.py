@@ -38,7 +38,7 @@ def matmult(*mats):
 
 def norm(psi):
     if is_vector(psi):
-        return dag(psi).dot(psi)[0,0].real
+        return inner(psi,psi).real
     if is_matrix(psi):
         return psi.diagonal().sum().real
 
