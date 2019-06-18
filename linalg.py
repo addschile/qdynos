@@ -15,7 +15,7 @@ def lanczos(A, nvecs=6, v0=None, return_evecs=True):
 
     # size of matrix
     m = A.shape[0]
-    if v0==None:
+    if v0 is None:
         # initialize random v0
         v0 = sp.random(m, 1, format='csr', dtype=A.dtype)
 
@@ -55,20 +55,20 @@ def arnoldi(A, nvecs=6, v0=None):
 
     # size of matrix
     m = A.shape[0]
-    if v0==None:
+    if v0 is None:
         # initialize random v0
         v0 = sp.random(m, 1, format='csr', dtype=A.dtype)
 
     # matrix of v's
     V = []
-    V.append( v0.copy()/np.sqrt(norm(v0)) )
+    V.append( v0.copy() )
 
     # form krylov subspace and upper hessenberg matrix
-    T = np.zeros((nvecs,nvecs))
+    T = np.zeros((nvecs,nvecs), dtype=v0.dtype)
     for j in range(nvecs-1):
-        w = matmult(A,sp.csr_matrix(V[j]))
+        w = matmult(A, V[j])
         for i in range(j+1):
-            T[i,j] = inner(w, sp.csr_matrix(V[i])).real
+            T[i,j] = inner(w, V[i])
             w -= T[i,j]*V[i]
         if j < nvecs-1:
             T[j+1,j] = np.sqrt(norm(w))
@@ -173,6 +173,6 @@ def krylov_prop(A, nvecs, psi, dt, method, lowmem=False, return_all=False):
             T , V = lanczos(A, nvecs=nvecs, v0=psi)
     psiout = propagate(V, T, dt)
     if return_all:
-        return psiout , V , T
+        return psiout , T , V
     else:
         return psiout
