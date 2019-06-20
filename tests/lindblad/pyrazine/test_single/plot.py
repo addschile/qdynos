@@ -1,0 +1,16 @@
+from pylab import *
+
+times = arange(0.0,1000.,1.0)
+da = loadtxt('db_pops_lindblad_jumps.dat')
+plot(times,da[:,0],'ob',mfc='none',markevery=1)#25)
+plot(times,da[:,1],'or',mfc='none',markevery=1)#25)
+da = loadtxt('db_pops_lindblad_jumps_eig.dat')
+plot(times,da[:,0],'-b')
+plot(times,da[:,1],'-r')
+da = loadtxt('db_pops_lindblad_jumps_arnoldi.dat')
+plot(times,da[:,0],'--b')
+plot(times,da[:,1],'--r')
+#xlim(0.,1000.)
+xlim(100.,400.)
+ylim(0.,1.)
+show()

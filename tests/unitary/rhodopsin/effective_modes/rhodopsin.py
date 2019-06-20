@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
 import sys
-sys.path.append('/Users/addisonschile/Software/')
+sys.path.append('/Users/addison/Software/')
 from qdynos.hamiltonian import Hamiltonian
 from qdynos.unitary import UnitaryWF
 from qdynos.results import Results
@@ -122,15 +122,22 @@ def construct_ops(eta):
     wrc   = 0.010368324784314521
     wrc = 0.2
     wrc = 0.6928203235924846
+    omegas = [0.28108324281655245, 0.9284217302870483, 1.560566044007544, 2.1906177542644674]
+    omegas = [0.28108324281655245, 0.9284217302851554, 1.560566044003241, 2.190617754259058]
+    wrc = omegas[0]
     kappa = None
     if eta == 0.25:
         kappa = 0.0003555032417164164
     elif eta == 2.5:
-        kappa = 0.0011241999593972628
+        #kappa = 0.0011241999593972628
+        kappas = [0.1595769120304555, 0.5878775384277286, 1.9686430749177224, 4.139489336967714]
+        kappa = kappas[0]
     elif eta == 5.0:
         #kappa = 0.001589858829398892
         #kappa = 0.04683986521945533
-        kappa = 0.22567583323508844
+        #kappa = 0.22567583323508844
+        kappas = [0.22567583323508844, 0.5878775384277282, 1.968643074917725, 4.13948933696769]
+        kappa = kappas[0]
     qrc = make_ho_q(nrc)
     hrc = make_ho_h(nrc,wrc)
 
@@ -233,7 +240,7 @@ if __name__ == '__main__':
     psi0, H, p0, p1, Ptrans0, Ptrans1, Pcis0, Pcis1 = construct_ops(eta)
 
     # set up qdynos and run
-    times = np.arange(0.0,4000.,1.0)
+    times = np.arange(0.0,2000.,1.0)
     ham = Hamiltonian(H, units='ev')
     dynamics = UnitaryWF(ham)
     output = dynamics.solve(psi0, times, options=Options(method='lanczos'), results=Results(tobs=len(times), e_ops=[p0,p1,Pcis0,Pcis1,Ptrans0,Ptrans1], print_es=True, es_file='rhodopsin_eta_%.2f.txt'%(eta)))
