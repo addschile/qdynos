@@ -187,10 +187,10 @@ class Lindblad(Dynamics):
 
         if self.options.seed==None:
             seeder = int(time())
-            np.random.seed( seeder )
+            rng = np.random.RandomState(seed=seeder)
         else:
             seeder = self.options.seed
-            np.random.seed( seeder )
+            rng = np.random.RandomState(seed=seeder)
             
         # make initial propagator
         self.just_jumped = 0
@@ -213,7 +213,7 @@ class Lindblad(Dynamics):
             # initialize time and a random number
             t = times[0]
             t_prev = times[0]
-            rand = np.random.uniform()
+            rand = rng.uniform()
     
             # set initial value of the integrator
             if self.options.method == 'exact':
@@ -288,7 +288,7 @@ class Lindblad(Dynamics):
     
                                 # jump
                                 self.ode.y /= np.sqrt(norm_guess)
-                                rand = np.random.uniform()
+                                rand = rng.uniform()
                                 self.ode.y , ind = self.jump(rand, self.ode.y)
                                 jumps.append( [t,ind] )
 
@@ -299,7 +299,7 @@ class Lindblad(Dynamics):
                                 self.jumping = 0
 
                                 # choose a new random number for next jump
-                                rand = np.random.uniform()
+                                rand = rng.uniform()
                                 break
                             elif (norm_guess < rand):
                                 # t_guess > t_jump
