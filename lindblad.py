@@ -107,7 +107,7 @@ class Lindblad(Dynamics):
         if self.options.unraveling:
             # add non-hermitian term
             for i in range(len(self.L)):
-                self.A -= 0.5j*self.LdL[i]
+                self.A -= 0.5j*self.LdL[i]*const.hbar
 
         if not (self.options.method == 'arnoldi' or self.options.method == 'lanczos'):
             self.A *= -1.j/const.hbar
