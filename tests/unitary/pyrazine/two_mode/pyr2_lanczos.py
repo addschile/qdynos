@@ -106,9 +106,9 @@ def construct_sys():
 def main():
 
     # parameters
-    dt = 0.5
+    dt = 1.0
     times = np.arange(0.0,1000.0,dt)
-    #times = np.arange(0.0,0.2,dt)
+    #times = np.arange(0.0,2.0,dt)
 
     # construct system
     H,psi0,p1,p2 = construct_sys()
@@ -116,7 +116,7 @@ def main():
     # set up qdynos and run
     ham = Hamiltonian(H, units='ev')
     dynamics = UnitaryWF(ham)
-    output = dynamics.solve(psi0, times, options=Options(method='lanczos'), results=Results(tobs=len(times), e_ops=[p1,p2,p1+p2], print_es=True, es_file='pyr2_lanczos.txt'))
+    output = dynamics.solve(psi0, times, options=Options(method='lanczos', nlanczos=5), results=Results(tobs=len(times), e_ops=[p1,p2,p1+p2], print_es=True, es_file='pyr2_lanczos.txt'))
 
 if __name__ == "__main__":
     main()
