@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from types import FunctionType
+#from types import FunctionType
 from numbers import Number
 
 # TODO with the whole dot thang
@@ -49,8 +49,21 @@ class Operator(object):
     def __repr__(self):
         return self.__str__()
 
-    # TODO
-    #def __eq__(self, op):
+    def __eq__(self, op):
+        """check whether two operators are equal
+        """
+        outval = False
+        if isinstance(op, Operator):
+            if self.type == op.type and self.dims==op.dims:
+                if (self-op).abs().sum()/max(self.dims) < 1.e-10:
+                    outval = True
+        elif isinstance(op, (np.ndarray, sp.spmatrix)):
+            if self.dims==op.shape:
+                if (self-op).abs().sum()/max(self.dims) < 1.e-10:
+                    outval = True
+        else:
+            outval = False
+        return outval
 
     def __add__(self, op):
         """Add with Operator on the left
@@ -213,6 +226,14 @@ class Operator(object):
                 raise AttributeError('Invalid shape for Operator class: '+str(axes))
             else:
                 return False
+
+    def abs(self):
+        """Return element-wise absolute values of operator matrix"""
+        return Operator(self.op)
+
+    def sum(self):
+        """Give sum over all elements of operator"""
+        return self.op.sum()
 
     def dag(self):
         """Return conjugate transpose"""
