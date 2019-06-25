@@ -110,7 +110,7 @@ class Lindblad(Dynamics):
                 self.A -= 0.5j*self.LdL[i]*const.hbar
 
         if not (self.options.method == 'arnoldi' or self.options.method == 'lanczos'):
-            self.A *= -1.j/const.hbar
+            self.A = (-1.j/const.hbar)*self.A
 
     def make_propagator(self, dt):
         if self.options.method == 'exact':
@@ -232,7 +232,7 @@ class Lindblad(Dynamics):
             for j in range(len(times)-1):
 
                 # for each time do results stuff
-                results_traj.analyze_state(count, self.ode.t, psi_track)
+                results_traj.analyze_state(count, times[j], psi_track)
                 count += 1
 
                 self.just_jumped = 0
