@@ -44,6 +44,7 @@ def lanczos(A, nvecs=6, v0=None, return_evecs=True):
         # compute beta
         T[i,i+1] = np.sqrt(nvprev)
         T[i+1,i] = T[i,i+1]
+        w,v = np.linalg.eigh(T)
     T[-1,-1] = inner(V[-1], matmult(A,V[-1])).real
 
     if return_evecs:
@@ -151,14 +152,17 @@ def lanczos_lowmem(A, nvecs, v0, dt):
 def propagate(V, T, dt):
     """
     """
+    #flag = 0
     nvecs = len(V)
     psiprop = expm(-1.j*dt*T/const.hbar)[:,0]
+    #if abs(psiprop[-1]) > 1e-3:
+    #    flag = 1
     for i in range(nvecs):
         if i==0:
             psiout = psiprop[i]*V[i]
         else:
             psiout += psiprop[i]*V[i]
-    return psiout
+    return psiout# , flag
 
 def krylov_prop(A, nvecs, psi, dt, method, lowmem=False, return_all=False):
     if lowmem:
@@ -176,3 +180,11 @@ def krylov_prop(A, nvecs, psi, dt, method, lowmem=False, return_all=False):
         return psiout , T , V
     else:
         return psiout
+    #psiout,flag = propagate(V, T, dt)
+    #if flag:
+    #    return krylov_prop(A, nvecs, psiout, dt, method, lowmem=lowmem, return_all=return_all)
+    #else:
+    #    if return_all:
+    #        return psiout , T , V
+    #    else:
+    #        return psiout
