@@ -66,16 +66,12 @@ class Results(object):
         self.expect = None
         self.print_es = print_es
         self.fes = None
+        self.es_file = es_file
         if e_ops != None:
             if isinstance(e_ops, list):
                 self.e_ops = e_ops
             else:
                 self.e_ops = [e_ops]
-            if self.print_es:
-                if es_file==None:
-                    self.fes = open("output.dat","w")
-                else:
-                    self.fes = open(es_file,"w")
             self.expect = np.zeros((len(self.e_ops),tobs))
         else:
             self.e_ops = e_ops
@@ -163,6 +159,12 @@ class Results(object):
                 self.print_state(ind, time, state)
         if self.e_ops != None:
             if self.print_es: 
+                if self.fes==None:
+                    # no file is open need to open one
+                    if self.es_file==None:
+                        self.fes = open("output.dat","w")
+                    else:
+                        self.fes = open(self.es_file,"w")
                 self.fes.write('%.8f '%(time))
             self.compute_expectation(ind, state)
             if self.print_es: 
