@@ -227,13 +227,17 @@ class Lindblad(Dynamics):
     
             # set up results
             results_traj = deepcopy(self.results)
+            # printing results file
+            if results_traj.print_es:
+                results_traj.es_file += "_traj_%d"%(i)
+            # printing states file
+            if results_traj.print_states:
+                results_traj.states_file += "_traj_%d"%(i)
     
-            count = 0
             for j in range(len(times)-1):
 
                 # for each time do results stuff
-                results_traj.analyze_state(count, times[j], psi_track)
-                count += 1
+                results_traj.analyze_state(j, times[j], psi_track)
 
                 self.just_jumped = 0
                 while self.ode.t != times[j+1]:
