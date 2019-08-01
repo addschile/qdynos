@@ -48,12 +48,12 @@ def is_hermitian(op):
             if np.allclose(dag(op), op):
                 return True
             else:
-                raise ValueError('Physical observables must be Hermitian')
+                return False
         else:
             if np.allclose(dag(op).data, op.data):
                 return True
             else:
-                raise ValueError('Physical observables must be Hermitian')
+                return False
     else:
         raise ValueError('Hermiticity check requires matrix')
 
