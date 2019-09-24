@@ -2,6 +2,7 @@ import numpy as np
 import qdynos.constants as const
 
 from .utils import dag,is_hermitian,is_vector,is_matrix
+from .log import print_warning
 
 class Hamiltonian(object):
     """Base Hamiltonian class.
@@ -44,7 +45,7 @@ class Hamiltonian(object):
         if is_hermitian(H):
             self.is_hermitian = True
         else:
-            raise ValueError('Hamiltonian is not Hermitian')
+            print_warning('Hamiltonian is not Hermitian')
 
     def eigensystem(self):
         """Computes eigenvalues and eigenvectors of Hamiltonian."""

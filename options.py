@@ -21,7 +21,7 @@ class Options(object):
         self.progress = progress 
 
         # integrator options #
-        assert(method in ['rk4','exact','lanczos','arnoldi'])
+        assert(method in ['euler','rk4','exact','lanczos','arnoldi'])
         self.method = method
 
         # unitary evolution options #
