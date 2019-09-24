@@ -180,6 +180,12 @@ class UnitaryWF(Dynamics):
             psi = psi0
             self.prop = -(1.j/const.hbar)*self.ham.ham
             ode = Integrator(self.dt, self.eom, self.options)
+        elif self.options.method == 'euler':
+            print_basic("Running dynamics with Forward Euler. This algorithm is far less stable than the others")
+            print_basic("Try setting options.method to lanczos or arnoldi if full diagonalization is prohibited.")
+            psi = psi0
+            self.prop = -(1.j/const.hbar)*self.ham.ham
+            ode = Integrator(self.dt, self.eom, self.options)
         else:
             # shouldn't ever get here because of options assert
             raise ValueError("Incorrect method specification")
