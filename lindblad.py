@@ -28,7 +28,7 @@ class Lindblad(Dynamics):
         self.ham = ham
         self.time_dep = time_dependent
 
-    def setup(self, gam, L, options, results, eig=False):
+    def setup(self, gam, L, options, results, eig=False, sparse=False):
         """
         """
         # options setup
@@ -63,9 +63,16 @@ class Lindblad(Dynamics):
             self.gam_re = np.array([gam.real])
             self.gam_im = np.array([gam.imag])
             self.L = [L.copy()]
-        self.precompute_operators(eig)
 
-    def precompute_operators(self, eig):
+        # make operators sparse if need be
+        if sparse:
+            for i in range(len(self.L)):
+                if not isinstance(self.L[i], sp.csr_matrix):
+                    self.L[i] = sp.csr_matrix(self.L[i])
+
+        self.precompute_operators(eig, sparse)
+
+    def precompute_operators(self, eig, sparse):
         """
         """
         nstates = self.ham.nstates
@@ -82,7 +89,10 @@ class Lindblad(Dynamics):
                     if not isinstance(self.results.e_ops[i], sp.csr_matrix):
                         self.results.e_ops[i] = sp.csr_matrix(self.results.e_ops[i])
         else:
-            lamb = np.zeros((nstates,nstates),dtype=complex)
+            if sparse:
+                lamb = sp.csr_matrix(np.zeros((nstates,nstates),dtype=complex))
+            else:
+                lamb = np.zeros((nstates,nstates),dtype=complex)
         if eig:
             self.ham.eigensystem()
         self.LdL = []
@@ -100,9 +110,15 @@ class Lindblad(Dynamics):
             lamb += self.gam_im[i]*self.LdL[i]
             self.LdL[i] *= self.gam_re[i]
         if eig:
-            self.A = self.ham.Heig + lamb
+            if sparse:
+                self.A = sp.csr_matrix(self.ham.Heig) + lamb
+            else:
+                self.A = self.ham.Heig + lamb
         else:
-            self.A = self.ham.ham + lamb
+            if sparse:
+                self.A = sp.csr_matrix(self.ham.ham) + lamb
+            else:
+                self.A = self.ham.ham + lamb
 
         if self.options.unraveling:
             # add non-hermitian term
@@ -110,7 +126,7 @@ class Lindblad(Dynamics):
                 self.A -= 0.5j*self.LdL[i]*const.hbar
 
         if not (self.options.method == 'arnoldi' or self.options.method == 'lanczos'):
-            self.A = (-1.j/const.hbar)*self.A
+            self.A *= -1.j/const.hbar
 
     def make_propagator(self, dt):
         if self.options.method == 'exact':
@@ -227,13 +243,17 @@ class Lindblad(Dynamics):
     
             # set up results
             results_traj = deepcopy(self.results)
+            # printing results file
+            if results_traj.print_es:
+                results_traj.es_file += "_traj_%d"%(i)
+            # printing states file
+            if results_traj.print_states:
+                results_traj.states_file += "_traj_%d"%(i)
     
-            count = 0
             for j in range(len(times)-1):
 
                 # for each time do results stuff
-                results_traj.analyze_state(count, times[j], psi_track)
-                count += 1
+                results_traj.analyze_state(j, self.ode.t, psi_track)
 
                 self.just_jumped = 0
                 while self.ode.t != times[j+1]:
@@ -329,12 +349,12 @@ class Lindblad(Dynamics):
 
         return avg_results(ntraj, self.results)
 
-    def solve(self, rho0, times, gam, L, ntraj=1000, eig=False, options=None, results=None):
+    def solve(self, rho0, times, gam, L, ntraj=1000, eig=False, sparse=False, options=None, results=None):
         """
         """
         self.dt = times[1]-times[0]
         self.tobs = len(times)
-        self.setup(gam, L, options, results, eig=eig)
+        self.setup(gam, L, options, results, eig=eig, sparse=sparse)
         if eig:
             if self.results.e_ops != None:
                 for i in range(len(self.results.e_ops)):
@@ -346,6 +366,9 @@ class Lindblad(Dynamics):
                 psi0 = rho0.copy()
             else:
                 raise AttributeError("Initial condition must be a wavefunction")
+            if sparse:
+                if not isinstance(psi0, sp.csr_matrix):
+                    psi0 = sp.csr_matrix(psi0)
             return self.integrate_trajectories(psi0, times, ntraj)
         else:
             if is_matrix(rho0):
