@@ -253,11 +253,7 @@ class Lindblad(Dynamics):
             for j in range(len(times)-1):
 
                 # for each time do results stuff
-<<<<<<< HEAD
-                results_traj.analyze_state(j, self.ode.t, psi_track)
-=======
                 results_traj.analyze_state(j, times[j], psi_track)
->>>>>>> 0d45b64c9799cad77f41a2b222ac17b104ad900c
 
                 self.just_jumped = 0
                 while self.ode.t != times[j+1]:
