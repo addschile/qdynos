@@ -26,6 +26,11 @@ class Integrator(object):
             self.dt = dt
             self.integrate = self.rk4_integrate
             self.integrate_range = self.rk4_integrate_range
+        elif options.method == 'euler':
+            self.order = 1
+            self.dt = dt
+            self.integrate = self.euler_integrate
+            #self.integrate_range = self.euler_integrate_range
         # TODO
         #elif options.method == 'adams':
         #    self.order = 4
@@ -57,6 +62,18 @@ class Integrator(object):
         solution of the equation of motion.
         """
         self.y = self.eom(self.y, 0)
+
+        if change_dt:
+            self.t += self.dt
+        if renorm:
+            self.y /= np.sqrt(norm(self.y))
+
+    def euler_integrate(self, renorm=0, change_dt=1):
+        """
+        This integration uses the 1st order forward Euler method to update the 
+        function based on the equation of motion.
+        """
+        self.y += self.dt*self.eom(self.y, 0)
 
         if change_dt:
             self.t += self.dt
