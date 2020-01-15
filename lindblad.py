@@ -52,7 +52,10 @@ class Lindblad(Dynamics):
                 print_method("Lindblad w/ Jumps")
         else:
             print_method("Lindblad QME")
-            self.ode = Integrator(self.dt, self.eom, self.options)
+            if self.options.method == 'arnoldi':
+                self.ode = Integrator(self.dt, self.eom_krylov, self.options)
+            else:
+                self.ode = Integrator(self.dt, self.eom, self.options)
 
         # Lindblad operators setup
         if isinstance(L, list):
@@ -76,7 +79,7 @@ class Lindblad(Dynamics):
         """
         """
         nstates = self.ham.nstates
-        if self.options.method == 'arnoldi':
+        if self.options.method == 'arnoldi' and self.options.unraveling:
             lamb = sp.csr_matrix((nstates,nstates))
             eig = False
             # check if relevant matrices are csr matrices #
@@ -100,11 +103,11 @@ class Lindblad(Dynamics):
             # transform lindblad operators into eigenbasis
             if eig:
                 self.L[i] = self.ham.to_eigenbasis(self.L[i])
-            if self.options.method == 'arnoldi':
+            if self.options.method == 'arnoldi' and self.options.unraveling:
                 if not isinstance(self.L[i], sp.csr_matrix):
                     self.L[i] = sp.csr_matrix(self.L[i])
             # make list of L^\dagger L for faster computations
-            self.LdL.append( matmult(dag(self.L[i]),self.L[i]) )
+            self.LdL.append( self.gam_re[i]*matmult(dag(self.L[i]),self.L[i]) )
             self.L[i] *= np.sqrt(self.gam_re[i])
             # compute lamb 
             lamb += self.gam_im[i]*self.LdL[i]
@@ -164,7 +167,8 @@ class Lindblad(Dynamics):
         for count in range(len(self.L)):
             if p <= np.sum(p_n[:count+1]):
                 psi_out = matmult(self.L[count], psi)
-                return psi_out/np.sqrt(p_n[count]) , count
+                #return psi_out/np.sqrt(p_n[count]) , count
+                return psi_out/np.sqrt(norm(psi_out)) , count
     
         assert(count<len(self.L))
 
@@ -188,6 +192,20 @@ class Lindblad(Dynamics):
         """
         """
         return matmult(self.expmA, state)
+
+    def _eom_krylov(self, state):
+        """
+        """
+        state = np.reshape(state, (self.ham.nstates,)*2)
+        drho = commutator(self.A,state)
+        for i in range(len(self.L)):
+            drho += (np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
+        return drho.ravel()
+
+    def eom_krylov(self, state, order):
+        return krylov_prop(self._eom_krylov, self.options.nlanczos, state, self.dt,
+                           self.options.method, nstates=self.ham.nstates,
+                           ret_type=state.dtype, lowmem=self.options.lanczos_lowmem)
 
     def eom(self, state, order):
         """
@@ -373,19 +391,32 @@ class Lindblad(Dynamics):
         else:
             if is_matrix(rho0):
                 rho = rho0.copy()
-                self.ode._set_y_value(rho, times[0])
             else:
                 print_warning("Converting wavefunction to density matrix.")
                 rho = matmult(rho0,dag(rho0))
-            btime = time()
-            for i,tau in enumerate(times):
-                if self.options.progress:
-                    if i%int(self.tobs/10)==0:
-                        etime = time()
-                        print_progress((100*i/self.tobs),(etime-btime))
-                if i%self.results.every==0:
-                    self.results.analyze_state(i, tau, self.ode.y)
-                self.ode.integrate()
+            if self.options.method == 'arnoldi':
+                rho.ravel()
+                self.ode._set_y_value(rho.ravel(), times[0])
+                btime = time()
+                for i,tau in enumerate(times):
+                    if self.options.progress:
+                        if i%int(self.tobs/10)==0:
+                            etime = time()
+                            print_progress((100*i/self.tobs),(etime-btime))
+                    if i%self.results.every==0:
+                        self.results.analyze_state(i, tau, np.reshape(self.ode.y,(self.ham.nstates,)*2))
+                    self.ode.integrate()
+            else:
+                self.ode._set_y_value(rho, times[0])
+                btime = time()
+                for i,tau in enumerate(times):
+                    if self.options.progress:
+                        if i%int(self.tobs/10)==0:
+                            etime = time()
+                            print_progress((100*i/self.tobs),(etime-btime))
+                    if i%self.results.every==0:
+                        self.results.analyze_state(i, tau, self.ode.y)
+                    self.ode.integrate()
             return self.results
 
 # TODO
