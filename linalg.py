@@ -9,15 +9,27 @@ from .utils import dag,inner,norm,matmult
 ################################################################################
 # Generalized krylov subspace method functions                                 #
 ################################################################################
-def lanczos(A, nvecs=6, v0=None, return_evecs=True):
+def lanczos(A, nvecs=6, v0=None, nstates=None, ret_type=None, return_evecs=True):
     """
     """
 
-    # size of matrix
-    m = A.shape[0]
+    # is A a linear operator function or a matrix
+    if not hasattr(A, '__call__'):
+        # size of matrix
+        m = A.shape[0]
+        ret_type = A.dtype
+
+    # is A a sparse matrix
+    if isinstance(A, sp.csr_matrix):
+        sparse = True
+
+    # initialize v0
     if v0 is None:
         # initialize random v0
-        v0 = sp.random(m, 1, format='csr', dtype=A.dtype)
+        if sparse:
+            v0 = sp.random(m, 1, format='csr', dtype=ret_type)
+        else:
+            v0 = np.random.rand(m,1).astype('complex')
 
     nvprev = norm(v0)
     nvprev2 = nvprev
@@ -31,7 +43,10 @@ def lanczos(A, nvecs=6, v0=None, return_evecs=True):
 
     # form krylov vectors and tridiagonal matrix
     for i in range(nvecs-1):
-        V.append( matmult(A,V[-1]) )
+        if not hasattr(A, '__call__'):
+            V.append( matmult(A,V[-1]) )
+        else:
+            V.append( A(V[-1]) )
         # compute alpha 
         T[i,i] = inner(V[-2],V[-1]).real
         if i>0:
@@ -52,13 +67,25 @@ def lanczos(A, nvecs=6, v0=None, return_evecs=True):
     else:
         return T
 
-def arnoldi(A, nvecs=6, v0=None):
+def arnoldi(A, nvecs=6, v0=None, nstates=None, ret_type=None):
 
-    # size of matrix
-    m = A.shape[0]
+    # is A a linear operator function or a matrix
+    if not hasattr(A, '__call__'):
+        # size of matrix
+        m = A.shape[0]
+        ret_type = A.dtype
+
+    # is A a sparse matrix
+    if isinstance(A, sp.csr_matrix):
+        sparse = True
+
+    # initialize v0
     if v0 is None:
         # initialize random v0
-        v0 = sp.random(m, 1, format='csr', dtype=A.dtype)
+        if sparse:
+            v0 = sp.random(m, 1, format='csr', dtype=ret_type)
+        else:
+            v0 = np.random.rand(m,1).astype('complex')
 
     # matrix of v's
     V = []
@@ -67,7 +94,10 @@ def arnoldi(A, nvecs=6, v0=None):
     # form krylov subspace and upper hessenberg matrix
     T = np.zeros((nvecs,nvecs), dtype=v0.dtype)
     for j in range(nvecs-1):
-        w = matmult(A, V[j])
+        if not hasattr(A, '__call__'):
+            w = matmult(A, V[j])
+        else:
+            w = A(V[j])
         for i in range(j+1):
             T[i,j] = inner(w, V[i])
             w -= T[i,j]*V[i]
@@ -152,19 +182,18 @@ def lanczos_lowmem(A, nvecs, v0, dt):
 def propagate(V, T, dt):
     """
     """
-    #flag = 0
     nvecs = len(V)
     psiprop = expm(-1.j*dt*T/const.hbar)[:,0]
-    #if abs(psiprop[-1]) > 1e-3:
-    #    flag = 1
     for i in range(nvecs):
         if i==0:
             psiout = psiprop[i]*V[i]
         else:
             psiout += psiprop[i]*V[i]
-    return psiout# , flag
+    return psiout
 
-def krylov_prop(A, nvecs, psi, dt, method, lowmem=False, return_all=False):
+def krylov_prop(A, nvecs, psi, dt, method, nstates=None, ret_type=None, lowmem=False, return_all=False):
+    """
+    """
     if lowmem:
         if method == 'arnoldi':
             raise ValueError("Arnoldi must store all vectors. No low memory option.")
@@ -172,19 +201,11 @@ def krylov_prop(A, nvecs, psi, dt, method, lowmem=False, return_all=False):
             return lanczos_lowmem(A, nvecs, psi, dt)
     else:
         if method == 'arnoldi':
-            T , V = arnoldi(A, nvecs=nvecs, v0=psi)
+            T , V = arnoldi(A, nvecs=nvecs, v0=psi, nstates=nstates, ret_type=ret_type)
         else:
-            T , V = lanczos(A, nvecs=nvecs, v0=psi)
+            T , V = lanczos(A, nvecs=nvecs, v0=psi, nstates=nstates, ret_type=ret_type)
     psiout = propagate(V, T, dt)
     if return_all:
         return psiout , T , V
     else:
         return psiout
-    #psiout,flag = propagate(V, T, dt)
-    #if flag:
-    #    return krylov_prop(A, nvecs, psiout, dt, method, lowmem=lowmem, return_all=return_all)
-    #else:
-    #    if return_all:
-    #        return psiout , T , V
-    #    else:
-    #        return psiout
