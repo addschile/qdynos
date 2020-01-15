@@ -23,7 +23,10 @@ def anticommutator(op1,op2):
     return op1.dot(op2) + op2.dot(op1)
 
 def inner(vec1,vec2):
-    return dag(vec1).dot(vec2)[0,0]
+    if vec1.ndim == 1:
+        return dag(vec1).dot(vec2)
+    else:
+        return dag(vec1).dot(vec2)[0,0]
 
 def outer(vec1,vec2):
     return vec1.dot(dag(vec2))
@@ -58,7 +61,10 @@ def is_hermitian(op):
         raise ValueError('Hermiticity check requires matrix')
 
 def is_vector(vec):
-    return vec.shape[0]!=vec.shape[1]
+    if vec.ndim == 1:
+        return 1
+    else:
+        return vec.shape[0]!=vec.shape[1]
 
 def is_matrix(mat):
     return mat.shape[0]==mat.shape[1]
