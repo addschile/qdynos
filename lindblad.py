@@ -108,11 +108,10 @@ class Lindblad(Dynamics):
                 if not isinstance(self.L[i], sp.csr_matrix):
                     self.L[i] = sp.csr_matrix(self.L[i])
             # make list of L^\dagger L for faster computations
+            self.LdL.append( matmult(dag(self.L[i]),self.L[i]) )
             if self.adjoint:
-                self.LdL.append( matmult(self.L[i],dag(self.L[i])) )
                 self.L[i] = np.sqrt(self.gam_re[i])*dag(self.L[i])
             else:
-                self.LdL.append( matmult(dag(self.L[i]),self.L[i]) )
                 self.L[i] *= np.sqrt(self.gam_re[i])
             # compute lamb 
             lamb += self.gam_im[i]*self.LdL[i]
@@ -135,7 +134,12 @@ class Lindblad(Dynamics):
 
         if self.options.unraveling:
             if not (self.options.method == 'arnoldi' or self.options.method == 'lanczos'):
-                self.A *= -1.j/const.hbar
+                if self.adjoint:
+                    self.A *= 1.j/const.hbar
+                else:
+                    self.A *= -1.j/const.hbar
+            #if self.adjoint:
+            #    self.A *= -1.
         else:
             if self.adjoint:
                 self.A *= 1.j/const.hbar
