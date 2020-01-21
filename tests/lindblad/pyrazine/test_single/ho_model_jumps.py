@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-sys.path.append('/Users/addison/Software/')
+sys.path.append('/Users/addisonschile/Software/')
 from qdynos.hamiltonian import Hamiltonian
 from qdynos.results import Results
 from qdynos.options import Options
@@ -94,7 +94,7 @@ def main(argv):
     hbar = 0.658229     # eV * fs
 
     t_init  = 0.0
-    t_final = 1000.
+    t_final = 500.
     dt      = 1.00
     times = np.arange(t_init,t_final,dt) # fs
     tobs = len(times)
