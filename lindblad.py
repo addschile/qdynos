@@ -14,19 +14,20 @@ from .dynamics import Dynamics
 from .utils import dag,commutator,anticommutator,inner,matmult,norm,is_vector,is_matrix
 from .options import Options
 from .results import Results,add_results,avg_results
-from .linalg import propagate,krylov_prop
+from .linalg import propagate,propagate_unitary,krylov_prop
 from .log import *
 
 class Lindblad(Dynamics):
     """
     """
 
-    def __init__(self, ham, time_dependent=False):
+    def __init__(self, ham, time_dependent=False, adjoint=False):
         """
         """
         super(Lindblad, self).__init__(ham)
         self.ham = ham
         self.time_dep = time_dependent
+        self.adjoint = adjoint
 
     def setup(self, gam, L, options, results, eig=False, sparse=False):
         """
@@ -107,8 +108,11 @@ class Lindblad(Dynamics):
                 if not isinstance(self.L[i], sp.csr_matrix):
                     self.L[i] = sp.csr_matrix(self.L[i])
             # make list of L^\dagger L for faster computations
-            self.LdL.append( self.gam_re[i]*matmult(dag(self.L[i]),self.L[i]) )
-            self.L[i] *= np.sqrt(self.gam_re[i])
+            self.LdL.append( matmult(dag(self.L[i]),self.L[i]) )
+            if self.adjoint:
+                self.L[i] = np.sqrt(self.gam_re[i])*dag(self.L[i])
+            else:
+                self.L[i] *= np.sqrt(self.gam_re[i])
             # compute lamb 
             lamb += self.gam_im[i]*self.LdL[i]
             self.LdL[i] *= self.gam_re[i]
@@ -128,8 +132,19 @@ class Lindblad(Dynamics):
             for i in range(len(self.L)):
                 self.A -= 0.5j*self.LdL[i]*const.hbar
 
-        if not (self.options.method == 'arnoldi' or self.options.method == 'lanczos'):
-            self.A *= -1.j/const.hbar
+        if self.options.unraveling:
+            if not (self.options.method == 'arnoldi' or self.options.method == 'lanczos'):
+                if self.adjoint:
+                    self.A *= 1.j/const.hbar
+                else:
+                    self.A *= -1.j/const.hbar
+            #if self.adjoint:
+            #    self.A *= -1.
+        else:
+            if self.adjoint:
+                self.A *= 1.j/const.hbar
+            else:
+                self.A *= -1.j/const.hbar
 
     def make_propagator(self, dt):
         if self.options.method == 'exact':
@@ -204,7 +219,7 @@ class Lindblad(Dynamics):
 
     def eom_krylov(self, state, order):
         return krylov_prop(self._eom_krylov, self.options.nlanczos, state, self.dt,
-                           self.options.method, nstates=self.ham.nstates,
+                           self.options.method, unitary=False, nstates=self.ham.nstates,
                            ret_type=state.dtype, lowmem=self.options.lanczos_lowmem)
 
     def eom(self, state, order):

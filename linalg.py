@@ -183,6 +183,18 @@ def propagate(V, T, dt):
     """
     """
     nvecs = len(V)
+    psiprop = expm(dt*T)[:,0]
+    for i in range(nvecs):
+        if i==0:
+            psiout = psiprop[i]*V[i]
+        else:
+            psiout += psiprop[i]*V[i]
+    return psiout
+
+def propagate_unitary(V, T, dt):
+    """
+    """
+    nvecs = len(V)
     psiprop = expm(-1.j*dt*T/const.hbar)[:,0]
     for i in range(nvecs):
         if i==0:
@@ -191,7 +203,7 @@ def propagate(V, T, dt):
             psiout += psiprop[i]*V[i]
     return psiout
 
-def krylov_prop(A, nvecs, psi, dt, method, nstates=None, ret_type=None, lowmem=False, return_all=False):
+def krylov_prop(A, nvecs, psi, dt, method, unitary=True, nstates=None, ret_type=None, lowmem=False, return_all=False):
     """
     """
     if lowmem:
@@ -204,7 +216,10 @@ def krylov_prop(A, nvecs, psi, dt, method, nstates=None, ret_type=None, lowmem=F
             T , V = arnoldi(A, nvecs=nvecs, v0=psi, nstates=nstates, ret_type=ret_type)
         else:
             T , V = lanczos(A, nvecs=nvecs, v0=psi, nstates=nstates, ret_type=ret_type)
-    psiout = propagate(V, T, dt)
+    if unitary:
+        psiout = propagate_unitary(V, T, dt)
+    else:
+        psiout = propagate(V, T, dt)
     if return_all:
         return psiout , T , V
     else:
