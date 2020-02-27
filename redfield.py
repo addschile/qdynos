@@ -141,7 +141,11 @@ class Redfield(Dynamics):
                     if self.options.print_coup_ops:
                         np.save(self.options.coup_ops_file+"c_op_%d"%(k),self.C[k])
                         np.save(self.options.coup_ops_file+"e_op_%d"%(k),self.E[k])
+                        np.save(self.options.coup_ops_file+"theta_plus_%d"%(k),theta_plus)
             elif self.options.space == "liouville":
+                if self.options.print_coup_ops:
+                    np.save(self.options.coup_ops_file+"Ga_%d"%(k),Ga)
+                    np.save(self.options.coup_ops_file+"theta_plus_%d"%(k),theta_plus)
                 gamma_plus  += np.einsum('lj,ik,ik->ljik', Ga, Ga, theta_plus)
                 gamma_minus += np.einsum('lj,ik,lj->ljik', Ga, Ga, theta_plus.conj().T)
         if self.options.space == "hilbert":
@@ -150,6 +154,9 @@ class Redfield(Dynamics):
                     self.prop[i,i] = 0.0
                     self.prop[i,i] -= np.sum(self.prop[:,i])
                 self.Rdep -= self.Rdep*np.eye(nstates)
+                if self.options.print_coup_ops:
+                    np.save(self.options.coup_ops_file+"prop.npy",self.prop)
+                    np.save(self.options.coup_ops_file+"Rdep.npy",self.Rdep)
         elif self.options.space == "liouville":
             self.R = (gamma_plus.transpose(2,1,3,0) + gamma_minus.transpose(2,1,3,0) -\
                      np.einsum('lj,irrk->ijkl', np.identity(nstates), gamma_plus) -\
