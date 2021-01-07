@@ -8,7 +8,7 @@ class Hamiltonian(object):
   """Base Hamiltonian class.
   """
 
-  def __init__(self, H, nstates=None, baths=None, units='au', convert=None):
+  def __init__(self, H, eig=True, nstates=None, baths=None, units='au', convert=None):
     """
     Parameters
     ----------
@@ -33,6 +33,8 @@ class Hamiltonian(object):
     self.ham = H
     self.baths = baths
     if self.baths != None: self.nbaths = len(self.baths)
+    if eig:
+      self.eigensystem()
     
   def __repr__(self):
     return "Hamiltonian class"
