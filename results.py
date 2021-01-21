@@ -42,7 +42,7 @@ class Results(object):
   Results class that helps organize and print out relevant results.
   """
 
-  def __init__(self, tobs=None, e_ops=None, print_es=False, es_file=None, 
+  def __init__(self, tobs=None, e_ops=None, print_es=False, es_every=1, es_file=None, 
                map_ops=False, store_states=False, print_final=False, 
                final_file=None, final_every=1, print_states=False, 
                states_file=None, states_every=1, jump_stats=False, every=1):
@@ -65,6 +65,7 @@ class Results(object):
     # expectation value containers #
     self.expect = None
     self.print_es = print_es
+    self.es_every = es_every
     self.fes = None
     self.es_file = es_file
     if e_ops != None:
@@ -158,18 +159,19 @@ class Results(object):
       if ind%self.states_every==0:
         self.print_state(ind, time, state)
     if self.e_ops != None:
-      if self.print_es: 
-        if self.fes==None:
-          # no file is open need to open one
-          if self.es_file==None:
-            self.fes = open("output.dat","w")
-          else:
-            self.fes = open(self.es_file,"w")
-        self.fes.write('%.8f '%(time))
-      self.compute_expectation(ind, state)
-      if self.print_es: 
-        self.fes.write('\n')
-        self.fes.flush()
+      if ind%self.es_every==0:
+        if self.print_es: 
+          if self.fes==None:
+            # no file is open need to open one
+            if self.es_file==None:
+              self.fes = open("output.dat","w")
+            else:
+              self.fes = open(self.es_file,"w")
+          self.fes.write('%.8f '%(time))
+        self.compute_expectation(ind, state)
+        if self.print_es: 
+          self.fes.write('\n')
+          self.fes.flush()
     if self.map_ops:
       self.mapping_expect(state)
     if ind==(self.tobs-1):
