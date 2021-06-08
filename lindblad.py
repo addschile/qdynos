@@ -73,7 +73,10 @@ class Lindblad(Dynamics):
       if self.options.method == 'arnoldi':
         self.ode = Integrator(self.dt, self.eom_krylov, self.options)
       else:
-        self.ode = Integrator(self.dt, self.eom, self.options)
+        if really_sparse:
+          self.ode = Integrator(self.dt, self.eom_really_sparse, self.options)
+        else:
+          self.ode = Integrator(self.dt, self.eom, self.options)
 
     # Lindblad rates setup
     self.gam_re = np.array(gam,dtype=np.complex128).real
@@ -89,14 +92,14 @@ class Lindblad(Dynamics):
     if sparse:
       if really_sparse:
         raise NotImplementedError
-        #for i in range(len(self.L)):
-        #  for j in range(nstates):
-        #    for k in range(nstates):
-        #      if self.L[j,k] != 0.:
-        #        ldl_list = [] # first list is for |L_mn|^2 the second is for [m,n]
-        #        ldl_list.append( np.conj(self.L[i][j,k])*self.L[i][j,k] ) # store |L_jk|^2
-        #        ldl_list.append([j,k]) # store jk
-        #        self.LdL.append(ldl_list)
+        for i in range(len(self.L)):
+          for j in range(nstates):
+            for k in range(nstates):
+              if self.L[j,k] != 0.:
+                ldl_list = [] # first list is for |L_mn|^2 the second is for [m,n]
+                ldl_list.append( np.conj(self.L[i][j,k])*self.L[i][j,k] ) # store |L_jk|^2
+                ldl_list.append([j,k]) # store jk
+                self.LdL.append(ldl_list)
       else:
         for i in range(len(self.L)):
           if not isinstance(self.L[i], sp.csr_matrix):
@@ -258,6 +261,12 @@ class Lindblad(Dynamics):
     drho = commutator(self.A,state)
     for i in range(len(self.L)):
       drho += (np.dot(self.L[i], np.dot(state, dag(self.L[i]))) - 0.5*anticommutator(self.LdL[i], state))
+    return drho
+
+  def eom_really_sparse(self, state, order):
+    """
+    """
+    drho = lb_deriv(state, self.A, self.LdL)
     return drho
 
   def integrate_trajectory(self, psi0, times, rng, traj_num=None):
