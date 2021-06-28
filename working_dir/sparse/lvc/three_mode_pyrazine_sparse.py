@@ -1,5 +1,9 @@
 import numpy as np
 import scipy.sparse as sp
+import scipy.sparse.linalg as spla
+
+def dag(op):
+    return op.conj().T
 
 def kron(*mats):
     out = mats[0].copy()
@@ -63,7 +67,7 @@ kt22 = 0.149
 # peierls coupling
 lamda = 0.262
 # times
-dt = 0.5
+dt = 0.1
 times = np.arange(0.0,500.,dt)
 
 # make position operators
@@ -100,6 +104,7 @@ H += kron(phi(1),eye(nc),eye(nt1),ht22)
 # Peierls coupling
 H += lamda*kron(phi(0,1),qc,eye(nt1),eye(nt2))
 H += lamda*kron(phi(1,0),qc,eye(nt1),eye(nt2))
+H = sp.csr_matrix(H, dtype=complex)
 
 # initial condition
 # e
@@ -121,9 +126,11 @@ psit2 = sp.csr_matrix(psit2)
 # full psi
 psi = kron(psie,psic,psit1,psit2)
 
-expects = np.zeros((len(times),2))
-#for i,time in enumerate(times):
-for i in range(1):
+tobs = len(times)
+expects = np.zeros((tobs,2))
+for i,time in enumerate(times):
+    if i%int(tobs/10)==0:
+        print('%d of %d'%(i,tobs))
     # compute expectation values
     try:
         expects[i,0] = dot(psi.conj().T, p1, psi).data[0].real
@@ -133,37 +140,42 @@ for i in range(1):
         expects[i,1] = dot(psi.conj().T, p2, psi).data[0].real
     except:
         expects[i,1] = 0.0
-    # build krylov subspace
-    tri = np.zeros((20,20))
-    #v = psi.copy()
-    #tri[0,0] = dot(v.conj().T, H, v).data[0].real
-    #for i in range(19):
-    #    w = dot(H,v) - tri[i,i]*v
-    #    v.append( dot(H,v[i]) - tri[i,i]*v[i] )
-    #    tri[i,i+1] = np.sqrt(dot(v[i+1].conj().T,v[i+1]).data[0].real)
-    #    tri[i+1,i] = tri[i,i+1]
-    #    tri[i+1,i+1] = dot(v[i].conj().T, H, v[i]).data[0].real
-    #print(tri)
-    #w,v = np.linalg.eigh(tri)
-    #print(w)
-    #w = np.exp(-1.j*dt*w)
-    v = [psi.copy()]
-    tri[0,0] = dot(v[0].conj().T, H, v[0]).data[0].real
-    for i in range(19):
-        v.append( dot(H,v[i]) - tri[i,i]*v[i] )
-        tri[i,i+1] = np.sqrt(dot(v[i+1].conj().T,v[i+1]).data[0].real)
-        tri[i+1,i] = tri[i,i+1]
-        v[i+1] /= tri[i,i+1]
-        tri[i+1,i+1] = dot(v[i].conj().T, H, v[i]).data[0].real
-    print(tri)
-    w,v = np.linalg.eigh(tri)
-    w = np.exp(-1.j*dt*w)
-    print(w)
-    #v = sp.csr_matrix(np.zeros((psi.shape[0],20),dtype=complex))
-    #v[:,0] = psi[:,0]
-    #tri[0,0] = dot(v[:,0].conj().T, H, v[:,0]).data[0].real
-    #for i in range(19):
-    #    v.append( dot(H,v[i]) - tri[i,i]*v[i] )
-    #    tri[i,i+1] = np.sqrt(dot(v[i+1],v[i+1]).data[0].real)
-    #    tri[i+1,i+1] = dot(v[i].conj().T, H, v[i]).data[0].real
-#np.savetxt("pyr_3_mode_sparse.txt",expects)
+    w,v = spla.eigsh(H,k=10,which='SA',v0=psi.toarray())
+    w = np.exp(-1.j*w*dt/hbar)
+    w = sp.csr_matrix(np.diag(w))
+    v = sp.csr_matrix(v)
+    psi = dot(v,w,dag(v),psi)
+#    # build krylov subspace
+#    tri = np.zeros((20,20))
+#    #v = psi.copy()
+#    #tri[0,0] = dot(v.conj().T, H, v).data[0].real
+#    #for i in range(19):
+#    #    w = dot(H,v) - tri[i,i]*v
+#    #    v.append( dot(H,v[i]) - tri[i,i]*v[i] )
+#    #    tri[i,i+1] = np.sqrt(dot(v[i+1].conj().T,v[i+1]).data[0].real)
+#    #    tri[i+1,i] = tri[i,i+1]
+#    #    tri[i+1,i+1] = dot(v[i].conj().T, H, v[i]).data[0].real
+#    #print(tri)
+#    #w,v = np.linalg.eigh(tri)
+#    #print(w)
+#    #w = np.exp(-1.j*dt*w)
+#    v = [psi.copy()]
+#    tri[0,0] = dot(v[0].conj().T, H, v[0]).data[0].real
+#    for i in range(19):
+#        v.append( dot(H,v[i]) - tri[i,i]*v[i] )
+#        tri[i,i+1] = np.sqrt(dot(v[i+1].conj().T,v[i+1]).data[0].real)
+#        tri[i+1,i] = tri[i,i+1]
+#        v[i+1] /= tri[i,i+1]
+#        tri[i+1,i+1] = dot(v[i].conj().T, H, v[i]).data[0].real
+#    print(tri)
+#    w,v = np.linalg.eigh(tri)
+#    w = np.exp(-1.j*dt*w)
+#    print(w)
+#    #v = sp.csr_matrix(np.zeros((psi.shape[0],20),dtype=complex))
+#    #v[:,0] = psi[:,0]
+#    #tri[0,0] = dot(v[:,0].conj().T, H, v[:,0]).data[0].real
+#    #for i in range(19):
+#    #    v.append( dot(H,v[i]) - tri[i,i]*v[i] )
+#    #    tri[i,i+1] = np.sqrt(dot(v[i+1],v[i+1]).data[0].real)
+#    #    tri[i+1,i+1] = dot(v[i].conj().T, H, v[i]).data[0].real
+np.savetxt("pyr_3_mode_sparse.txt",expects)
