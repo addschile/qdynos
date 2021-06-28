@@ -650,30 +650,3 @@ def make_lindblad_from_rf(ham, sparse=False, adjoint=False):
     return rf.L0 , rf.LdL, lb
   else:
     return rf.gams , rf.Ls, lb
-
-# TODO
-#def make_lindblad_ops(ham):
-#  """
-#  """
-#  nstates = ham.nstates
-#  for k,bath in enumerate(ham.baths):
-#    Ga = ham.to_eigenbasis( bath.c_op )
-#    theta_zero = bath.ft_bath_corr(0.0)
-#    theta_plus = theta_zero*np.identity(nstates,dtype=complex)
-#    for i in range(nstates):
-#      for j in range(nstates):
-#        if i!=j:
-#          theta_plus[i,j] = bath.ft_bath_corr(-ham.omegas[i,j])
-#    if self.options.print_coup_ops:
-#      np.save(self.options.coup_ops_file+"c_op_%d"%(k),Ga)
-#      np.save(self.options.coup_ops_file+"theta_plus_%d"%(k),theta_plus)
-#    # population transfer matrix
-#    prop += 2.*np.einsum('ji,ij,ij->ij',Ga,Ga,theta_plus.real)/const.hbar**2.
-#    # dephasing matrix
-#    self.Rdep += np.einsum('jj,ii,ii->ij',Ga,Ga,theta_plus)
-#    self.Rdep += np.einsum('jj,ii,jj->ij',Ga,Ga,theta_plus.conj().T)
-#    same_ik = np.einsum('im,mi,mi->i',Ga,Ga,theta_plus)
-#    same_lj = np.einsum('im,mi,im->i',Ga,Ga,theta_plus.conj().T)
-#    for i in range(nstates):
-#      self.Rdep[i,:] -= same_ik[i]
-#      self.Rdep[:,i] -= same_lj[i]
