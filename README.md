@@ -39,5 +39,6 @@ python setup.py install
 See the examples in the examples folder for testing installation and usage.
 
 ##Extending qdynos
-
+```
+```
 I have worked at various times on thinking about ways to generalize parts of the code. There are some sparse implementations and Krylov subspace methods have been implemented for a number of clases, though these can likely be refactored. Other useful extensions would be implementing higher-order integrators with adaptive time-stepping (e.g. scipy.odeintegrate), adding different dynamics methods (e.g. HEOM), and adding new sets of calculations like spectroscopy calcualtions. Check out the working_dir if you want to check out any of my half-baked attempts at some generalizations.
