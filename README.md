@@ -1,4 +1,6 @@
-QDYNOS - A not so prehistoric way to do quantum dynamics in python!
+### QDYNOS
+
+A not so prehistoric way to do quantum dynamics in python!
 
 This is a small package that can perform quantum dynamics on model systems that are represented as vectors or matrices. For a code that can perform MCTDH calculations in python see my [pymctdh](https://github.com/addschile/pymctdh) code!
 
