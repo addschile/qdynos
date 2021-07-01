@@ -82,6 +82,9 @@ class Lindblad(Dynamics):
     if isinstance(gam, list):
       self.gam_re = np.array(gam,dtype=np.complex128).real
       self.gam_im = np.array(gam,dtype=np.complex128).imag
+    elif isinstance(gam, np.ndarray):
+      self.gam_re = gam.real
+      self.gam_im = gam.imag
     else:
       self.gam_re = np.array([gam],dtype=np.complex128).real
       self.gam_im = np.array([gam],dtype=np.complex128).imag
