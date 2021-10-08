@@ -1,6 +1,6 @@
 import numpy as np
 
-class Options(object):
+class Options:
   """
   Options class for specific non-default options for dynamics classes.
   """

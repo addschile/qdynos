@@ -37,7 +37,7 @@ def avg_results(ntraj, results):
     results.maps /= float(ntraj)
   return results
 
-class Results(object):
+class Results:
   """
   Results class that helps organize and print out relevant results.
   """
