@@ -1,9 +1,8 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 
-class Dynamics():
+class Dynamics(ABC):
   """Abstract base class for dynamics.
   """
-  __metaclass__ = ABCMeta
   def __init__(self, hamiltonian):
     """Initialize the Dynamics class.
 
