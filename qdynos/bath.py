@@ -31,7 +31,7 @@ def _sample_modes(omega, kT, sample):
 # use numpy vectorization
 sample_modes = np.vectorize(_sample_modes)
 
-class Bath(object):
+class Bath:
   """Base bath class -- class that handles the relevant functions and integrals
   of the bath correlation function <q(t)q(0)>.
 
