@@ -2,7 +2,7 @@ from __future__ import absolute_import
 import numpy as np
 from .utils import dag,norm
 
-class Integrator(object):
+class Integrator:
 
   def __init__(self, dt, eom, options):
     """
