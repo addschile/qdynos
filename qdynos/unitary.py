@@ -28,7 +28,6 @@ class UnitaryDM(Dynamics):
     hamiltonian : Hamiltonian
     """
     super(UnitaryDM, self).__init__(hamiltonian)
-    self.ham = hamiltonian
     print_method("Unitary DM")
 
   def __str__(self):
@@ -113,7 +112,6 @@ class UnitaryWF(Dynamics):
 
   def __init__(self, hamiltonian):
     super(UnitaryWF, self).__init__(hamiltonian)
-    self.ham = hamiltonian
     print_method("Unitary WF")
     const.working_units()
 

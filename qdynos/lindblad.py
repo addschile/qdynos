@@ -42,7 +42,6 @@ class Lindblad(Dynamics):
     """
     """
     super(Lindblad, self).__init__(ham)
-    self.ham = ham
     self.time_dep = time_dependent
     self.adjoint = adjoint
 

@@ -29,7 +29,7 @@ class Redfield(Dynamics):
     options : Options class
     """
     super(Redfield, self).__init__(ham)
-    self.ham = ham
+    #self.ham = ham
     self.time_dep = time_dependent
     self.is_secular = is_secular
     if self.time_dep:

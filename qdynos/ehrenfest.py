@@ -17,7 +17,6 @@ class Ehrenfest(Dynamics):
     """
     """
     super(Ehrenfest, self).__init__(ham)
-    self.ham = ham
     if options==None:
       self.options = Options()
     else:
